@@ -25,6 +25,8 @@ from pathlib import Path
 import httpx
 from markdownify import markdownify
 
+from lib import pii
+
 import episode  # scripts/ 가 sys.path 에 있음(스크립트 직접 실행·테스트 모두)
 
 WIKI_ROOT = Path(__file__).parent.parent
@@ -372,9 +374,15 @@ def main() -> None:
     elif args.file:
         saved = ingest_file(Path(args.file), resonance=args.resonance)
         _record_ingest_episode("ingest_file", args.file, args.resonance, saved)
+        if saved:
+            try:
+                pii.warn_if_pii(saved.read_text(encoding="utf-8", errors="replace"), saved.name)
+            except OSError:
+                pass
     elif args.note:
         saved = save_note(args.note, resonance=args.resonance)
         _record_ingest_episode("ingest_note", args.note, args.resonance, saved)
+        pii.warn_if_pii(args.note, "방금 넣은 메모")
 
     # 미처리 파일 목록 출력
     pending = find_unprocessed(priority_only=args.priority_only)

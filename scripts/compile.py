@@ -35,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import ingest  # noqa: E402  (미처리 목록·완료 표시를 재사용 — 같은 규칙을 두 번 쓰지 않는다)
-from lib import llm_client  # noqa: E402
+from lib import llm_client, pii  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 WIKI_DIR = ROOT / "wiki"
@@ -243,6 +243,8 @@ def _parse_live_output(out: str) -> tuple[Path, str] | None:
 
 
 async def _page_by_llm(raw_file: Path, text: str) -> tuple[Path, str] | None:
+    # 본문이 그대로 외부 AI 서비스로 나간다. 나가기 전에 한 번 알린다.
+    pii.warn_if_pii(text, raw_file.name)
     out = await llm_client.call_llm(_build_prompt(raw_file, text))
     return _parse_live_output(out)
 
