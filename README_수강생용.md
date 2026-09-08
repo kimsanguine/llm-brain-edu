@@ -23,11 +23,11 @@
 터미널(맥은 "터미널", 윈도우는 "명령 프롬프트")을 열고 아래를 붙여넣습니다.
 
 ```bash
-git clone <저장소 주소>
+git clone https://github.com/kimsanguine/llm-brain-edu.git
 cd llm-brain-edu
 ```
 
-`git` 이 없다면 저장소 페이지에서 **Code → Download ZIP** 으로 받아 압축을 풀고, 그 폴더로 들어가면 됩니다.
+`git` 이 없다면 [저장소 페이지](https://github.com/kimsanguine/llm-brain-edu)에서 **Code → Download ZIP** 으로 받아 압축을 풀고, 그 폴더로 들어가면 됩니다.
 
 ### 2단계. 준비물 설치 (5분)
 
