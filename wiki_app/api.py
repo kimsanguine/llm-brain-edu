@@ -253,7 +253,9 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
                      "degree": (n.get("inbound") or 0) + (n.get("outbound") or 0)}
                     for n in pages
                 ]
-                wl = [l for l in g.get("links", []) if l.get("kind") == "wikilink"]
+                # 태그 연결도 센다. RULE 경로(키 없는 학생)에는 wikilink 가 아예
+                # 안 생기므로, wikilink 만 세면 LINKS 가 영원히 0 으로 보인다.
+                wl = [l for l in g.get("links", []) if l.get("kind") in ("wikilink", "tag")]
                 # id 가 없거나 리스트인 노드가 섞이면 뒤의 set 생성에서 죽는다.
                 # 여기서 걸러야 "빈 목록 → 파일 스캔 폴백"이 정상 동작한다.
                 # slug 뿐 아니라 title 도 문자열이어야 한다. 프런트가 title.slice() 를
@@ -295,7 +297,20 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
         }
 
         # ④ 손봐야 할 곳
-        raw_n = len(list((root / "raw").rglob("*.md"))) if (root / "raw").is_dir() else 0
+        # raw 원본은 컴파일 후에도 남는다. 전체를 세면 다 처리한 학생에게도
+        # "손봐야 할 곳 14"가 영원히 떠서, 끝냈는데 안 끝난 것처럼 보인다.
+        # 같은 판정을 scripts/ingest.py 의 find_unprocessed() 도 한다.
+        raw_n = 0
+        if (root / "raw").is_dir():
+            done: set[str] = set()
+            try:
+                st = json.loads((root / ".ingest_state.json").read_text(encoding="utf-8"))
+                if isinstance(st, dict) and isinstance(st.get("processed"), list):
+                    done = {str(x) for x in st["processed"]}
+            except (json.JSONDecodeError, OSError, TypeError):
+                done = set()
+            raw_n = sum(1 for f in (root / "raw").rglob("*.md")
+                        if f.relative_to(root).as_posix() not in done)
         review = sorted(f.name for f in (root / "review").glob("*.md")) if (root / "review").is_dir() else []
 
         # 그래프에 그릴 노드는 연결이 많은 순 60개. 링크도 그 안의 것만 보낸다.
@@ -311,6 +326,26 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
                     if l.get("kind") == "wikilink"
                     and l.get("source") in top_slugs and l.get("target") in top_slugs
                 ]
+                if not links:
+                    # RULE 경로에는 wikilink 가 없다. 그대로 두면 지도가 점만 찍힌
+                    # 화면이 되어 "쌓이고 있다"가 안 보인다. 같은 태그를 단 페이지끼리
+                    # 잇는다. 다만 한 태그를 6개 넘게 단 경우는 잇지 않는다 —
+                    # 모두-모두 연결이 되어 지도가 검게 뭉갠다.
+                    by_tag: dict[str, list[str]] = {}
+                    for l in g2.get("links", []):
+                        if l.get("kind") == "tag" and l.get("source") in top_slugs:
+                            by_tag.setdefault(str(l.get("target")), []).append(str(l["source"]))
+                    seen: set[tuple[str, str]] = set()
+                    for members in by_tag.values():
+                        if len(members) > 6:
+                            continue
+                        for i in range(len(members)):
+                            for j in range(i + 1, len(members)):
+                                pair = (members[i], members[j]) if members[i] < members[j] \
+                                    else (members[j], members[i])
+                                if pair[0] != pair[1] and pair not in seen:
+                                    seen.add(pair)
+                    links = [{"s": a, "t": b} for a, b in sorted(seen)][:120]
             except (json.JSONDecodeError, OSError, KeyError, AttributeError, TypeError):
                 links = []
 

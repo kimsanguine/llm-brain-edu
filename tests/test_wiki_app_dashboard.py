@@ -149,6 +149,79 @@ def test_graph_links_limited_to_shown_nodes(brain):
     assert k["orphans"] == 0
 
 
+def test_rule_path_brain_still_shows_links_and_a_map(brain):
+    """wikilink 가 하나도 없어도 LINKS 와 지도의 선이 0 이 아니다.
+
+    깨지면: 키 없이 시작한 학생(개강 전 대부분)의 첫 화면이 점만 찍힌 지도와
+    LINKS 0 이 된다. RULE 경로는 wikilink 를 못 만들고 태그만 남기므로,
+    태그를 안 세면 "쌓이고 있다"가 영원히 안 보인다.
+    """
+    for slug in ("a", "b", "c"):
+        _page(brain, slug, f"메모 {slug}")
+    (brain / "wiki" / "graph.json").write_text(json.dumps({
+        "nodes": [{"id": x, "slug": x, "title": f"메모 {x}", "kind": "page"} for x in "abc"]
+               + [{"id": "tag:반복업무", "kind": "tag"}],
+        "links": [{"source": x, "target": "tag:반복업무", "kind": "tag"} for x in "abc"],
+    }), encoding="utf-8")
+
+    res = _client(brain).get("/api/dashboard").json()
+    assert res["knowledge"]["links"] == 3
+    # 같은 태그를 단 셋이 서로 이어진다 → 3 쌍
+    assert len(res["knowledge"]["graph_links"]) == 3
+
+
+def test_a_very_common_tag_does_not_black_out_the_map(brain):
+    """한 태그를 7개 넘게 달아도 모두-모두 선으로 지도를 뭉개지 않는다.
+
+    깨지면: 학생이 모든 메모에 같은 태그(예: note)를 달았을 때 선이 수십 개로
+    폭발해 지도가 까맣게 칠해진다. 연결이 많은 게 아니라 안 보이는 것이 된다.
+    """
+    slugs = [f"p{i}" for i in range(8)]
+    for x in slugs:
+        _page(brain, x, f"메모 {x}")
+    (brain / "wiki" / "graph.json").write_text(json.dumps({
+        "nodes": [{"id": x, "slug": x, "title": f"메모 {x}", "kind": "page"} for x in slugs],
+        "links": [{"source": x, "target": "tag:note", "kind": "tag"} for x in slugs],
+    }), encoding="utf-8")
+
+    res = _client(brain).get("/api/dashboard").json()
+    assert res["knowledge"]["graph_links"] == []
+
+
+def test_compiled_notes_leave_the_attention_list(brain):
+    """컴파일이 끝난 메모는 "손봐야 할 곳"에서 빠진다.
+
+    깨지면: raw 원본은 컴파일 후에도 남으므로, 다 끝낸 학생에게도 "RAW 14"가
+    영원히 떠 있다. 끝냈는데 안 끝난 것처럼 보이면 진척이 안 읽힌다.
+    """
+    raw = brain / "raw" / "notes"
+    raw.mkdir(parents=True)
+    (raw / "one.md").write_text("메모 하나", encoding="utf-8")
+    (raw / "two.md").write_text("메모 둘", encoding="utf-8")
+    before = _client(brain).get("/api/dashboard").json()
+    assert before["attention"]["raw_pending"] == 2
+
+    (brain / ".ingest_state.json").write_text(
+        json.dumps({"processed": ["raw/notes/one.md"]}), encoding="utf-8")
+    after = _client(brain).get("/api/dashboard").json()
+    assert after["attention"]["raw_pending"] == 1
+
+
+def test_broken_state_file_does_not_break_the_screen(brain):
+    """상태 파일이 깨져 있어도 화면은 뜬다.
+
+    깨지면: 학생이 실습 중 파일을 잘못 건드렸을 때 대시보드가 통째로 500 이 된다.
+    """
+    raw = brain / "raw" / "notes"
+    raw.mkdir(parents=True)
+    (raw / "one.md").write_text("메모", encoding="utf-8")
+    (brain / ".ingest_state.json").write_text("{깨진 json", encoding="utf-8")
+
+    r = _client(brain).get("/api/dashboard")
+    assert r.status_code == 200
+    assert r.json()["attention"]["raw_pending"] == 1
+
+
 def test_dashboard_does_not_write_anything(brain):
     """대시보드를 열어도 파일이 하나도 바뀌지 않는다(읽기 전용 가드레일)."""
     _page(brain, "a", "에이")

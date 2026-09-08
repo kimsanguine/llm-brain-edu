@@ -175,7 +175,18 @@ uv run python scripts/compile.py
 uv run python -m wiki_app
 ```
 
-브라우저에서 **http://localhost:8000** 을 엽니다. 방금 넣은 메모 3개가 페이지로 보이면 완료입니다.
+터미널에 **주소가 한 줄 찍힙니다.** 거기 적힌 주소를 브라우저에 넣으세요.
+
+```
+  브라우저에서 열어 보세요 →  http://localhost:8000
+```
+
+방금 넣은 메모 3개가 페이지로 보이면 완료입니다.
+
+> **8000 이 아니라 8001 이라고 나올 수도 있습니다.** 정상입니다.
+> 컴퓨터에서 다른 프로그램(주피터 노트북 등)이 이미 8000 번 자리를 쓰고 있으면
+> 빈 자리를 찾아서 엽니다. 터미널에 찍힌 주소를 그대로 쓰면 됩니다.
+> 아파트 주차장에서 내 자리가 차 있으면 옆 자리에 대는 것과 같습니다.
 
 > 📸 **이 화면을 캡처해서 제출 폼에 올리세요.**
 
@@ -266,5 +277,5 @@ setx OPENROUTER_API_KEY "발급받은키"
 | 메모 넣기 | `uv run python scripts/ingest.py --note "내용"` |
 | 파일 넣기 | `uv run python scripts/ingest.py --file ~/문서/파일.pdf` |
 | 위키 만들기 | `uv run python scripts/compile.py` |
-| 화면 보기 | `uv run python -m wiki_app` → http://localhost:8000 |
+| 화면 보기 | `uv run python -m wiki_app` → 터미널에 찍힌 주소 (보통 http://localhost:8000) |
 | 예제로 화면 먼저 보기 | `uv run python scripts/compile.py --seed` |
