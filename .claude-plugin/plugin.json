@@ -1,0 +1,20 @@
+{
+  "name": "llm-brain",
+  "description": "raw/ 소스를 wiki/로 컴파일하는 개인 지식 위키 컴파일러 + OKF v0.1 export 포트. ingest(4채널)·curate(점진 압축·그래프·메타점수)·express·query·okf·doctor(설치 진단)·wikiweb(웹 UI) 커맨드 + Agent Memory OS 5층 기억(작업·에피소드·의미·절차·메타). LLM을 컴파일러로 쓰는 Karpathy 패턴 + Forte CODE.",
+  "version": "0.3.0",
+  "author": {
+    "name": "Sanguine Kim",
+    "url": "https://github.com/kimsanguine"
+  },
+  "license": "MIT",
+  "keywords": [
+    "second-brain",
+    "knowledge-management",
+    "llm-wiki",
+    "okf",
+    "open-knowledge-format",
+    "obsidian",
+    "claude-code",
+    "wiki-compiler"
+  ]
+}

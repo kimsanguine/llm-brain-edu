@@ -1,0 +1,65 @@
+# LLM Wiki — 소스 경로 설정 예시
+# 실제 사용 시 이 파일을 sources.yaml로 복사 후 경로를 수정한다.
+# sync_raw.py가 이 파일을 읽고 raw/ 폴더로 델타 미러링한다.
+
+sources:
+  # ── 예시 1: Obsidian vault TIL 폴더 ──────────────────────────────
+  - id: til
+    source: ~/Documents/MyVault/TIL/
+    target: raw/til/
+    ttl_days: 180
+    extensions: [md]                    # 생략 시 md·txt·pdf·docx·pptx 전부
+    exclude_tags: [private, diary]      # frontmatter tags로 제외
+    note: 내 TIL 폴더
+    disabled: true                      # 활성화하려면 이 줄 삭제
+
+  # ── 예시 2: 회의록 폴더 ───────────────────────────────────────────
+  - id: meetings
+    source: ~/Documents/Meetings/
+    target: raw/meetings/
+    ttl_days: 90
+    extensions: [md, docx]
+    note: 회의록 (MD + Word 혼용)
+    disabled: true
+
+  # ── 예시 3: 논문·발표자료 (PDF·PPT) ──────────────────────────────
+  - id: papers
+    source: ~/Documents/Papers/
+    target: raw/docs/
+    ttl_days: 0
+    extensions: [pdf, pptx]
+    note: 논문·발표자료
+    disabled: true
+
+  # ── 예시 4: 블로그 포스트 ─────────────────────────────────────────
+  - id: blog
+    source: ~/Documents/blog/posts/
+    target: raw/blog/
+    ttl_days: 0
+    extensions: [md]
+    note: 블로그 발행 콘텐츠
+    disabled: true
+
+  # ── 예시 5: 뉴스레터 (capture filter 적용) ────────────────────────
+  # require_keywords·min_word_count는 둘 다 선택 필드 — 미설정 소스는 기존과 동일 동작.
+  # md·txt만 본문 판정 대상이며 pdf·docx·pptx는 필터 미적용 통과.
+  - id: newsletters
+    source: ~/Documents/Newsletters/
+    target: raw/newsletters/
+    ttl_days: 90
+    extensions: [md]
+    require_keywords: [agent, LLM, RAG]   # 하나라도 본문에 포함되면 통과 (대소문자 무시)
+    min_word_count: 50                    # 공백 분리 단어 수 미만이면 raw로 미복사
+    note: AI 뉴스레터 (잡음 필터링)
+    disabled: true
+
+lifecycle:
+  archive_dir: wiki/archive/
+  domains:
+    concepts:  {ttl_days: 0}
+    tools:     {ttl_days: 0}
+    people:    {ttl_days: 0}
+    projects:  {ttl_days: 0}
+    business:  {ttl_days: 0}
+    lecture:   {ttl_days: 0}
+    insights:  {ttl_days: 365}

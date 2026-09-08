@@ -1,0 +1,67 @@
+# OKF Export 설정 (Phase 1)
+#
+# scripts/okf_export.py 의 load_config() 가 읽는다.
+# 이 파일은 wiki/ → okf/ 투영 시 "무엇을 제외할지"를 감사 가능한 형태로 고정한다.
+# 제외가 분류기 추론이 아니라 명시적 설정이라야 public 커밋 전에 사람이 눈으로 검토할 수 있다.
+#
+# 공개 계약: SPEC.md 및 schema/okf.md
+# 매핑 레퍼런스: schema/okf.md
+
+# exclude_paths — 1차 필터(구조적 보장). wiki_dir 기준 glob 패턴.
+#   여기 매칭된 경로는 okf/ 번들에서 완전히 빠진다(파일 미작성 + ExportStats.excluded 기록).
+#   경로 기반이라 도메인 분류기 오탐 여지가 없다 = 민감 정보 누락의 1차 방어선.
+exclude_paths:
+  - "business/**"     # 민감 비즈니스 정보 (anthropic·habix-profile·openai·thinking-machines 4페이지)
+  - "canvas/**"       # gitignore 대상 canvas 데이터
+  - "episodes/**"     # Agent Memory OS — 에피소드 원장(운영 맥락). 방어 이중망: okf는 wiki/만 스캔하나 명시 제외
+  - "procedures/**"   # Agent Memory OS — 절차 메모리. 동일 방어
+  - "observing/**"    # v0.3 Promotion Gates — 유예 후보 보관(사적 판단 로그). 3점 방어 중 설정 측 (SPEC v0.3 §D)
+  - "rejected/**"     # v0.3 Promotion Gates — 기각 로그(사유 포함). 동일 방어
+  - "reweave_queue.md"  # v0.3 reweave 운영 큐 — wiki/ 루트 산출물. okf META_FILES 미등재라 config 로 봉인
+  - "contradiction_queue.md"  # v0.3.1 WS-5 모순 후보 큐 — 동일 봉인(reweave_queue 선례)
+
+# exclude_domains — (선택) 보조 제외. frontmatter 의 domain 라벨 기준.
+#   경로가 아닌 의미 라벨로 거를 때 사용. 비워 두면 비활성.
+#   주의: domain 라벨은 ingest 분류 결과라 오탐 여지가 있다 → 1차 방어는 exclude_paths.
+exclude_domains: []
+
+# exclude_slugs — (선택) 특정 페이지 명시 제외. slug 단위 정밀 제외.
+#   business/ 밖에 산재한 개별 민감 페이지를 dry-run 검토 후 추가할 때 사용.
+exclude_slugs: []
+
+# ── scope:private 필터 (v0.3.2 WS-6, 코드 레벨·설정 아님) ────────────────────
+#   frontmatter `scope: private` 페이지는 okf_export._is_scope_private 가 공개 번들에서
+#   **항상** 제외한다(이 yaml 키가 아니라 코드로 강제 — plugin/flag 없이도 동작).
+#   dry-run 요약의 `private=N` + log.md 의 "scope:private 로 제외된 페이지" 섹션으로 표면화.
+#   scope 미지정·shared 는 포함(하위호환). 이 yaml 을 감사할 때 private 페이지도 별도로
+#   빠진다는 점을 유의(exclude_paths/slugs 목록엔 안 나타남).
+
+# sensitive_patterns — (선택) included 페이지 본문의 평문 민감정보 스캐너.
+#   페이지 단위 제외(exclude_*)는 business *파일*만 막고, included 본문 산문에 흩어진
+#   평문(실명·운영수치 등)은 못 막는다(별칭 redact도 [[링크]]만 처리). 이 패턴들을
+#   본문/description에서 대소문자 무시로 스캔해 dry-run/log에 "검토 필요"로 표면화한다.
+#   차단이 아니라 표면화(Rule 8 fail-loud) — 사람이 커밋 전에 직접 판단하도록.
+#   🔴 실값(실명·내부 프로젝트명 등)은 **이 파일에 넣지 말 것** — 이 파일은 커밋되므로
+#      주석/값에 실명을 적으면 그 자체가 누출이다. 실 패턴은 gitignored
+#      schema/okf_export.local.yaml 에만 둔다(아래 exclude_slugs 도 동일).
+#   예: ["<본인-실명>", "<내부-프로젝트-코드명>"] 형태로 .local.yaml 에 작성.
+sensitive_patterns: []
+
+# share_policy — `--share`에서만 적용되는 fail-closed 공개 경계.
+# 기본 OKF export는 개인용/레거시 호환 경로이며 이 정책을 강제하지 않는다.
+# 승인 값은 사람이 CLI에 직접 제공해야 하며 manifest에는 기록되지 않는다.
+# `--share --config`는 이 canonical 파일만 허용한다. local overlay는
+# exclude_slugs/sensitive_patterns 추가만 가능하며 아래 policy를 재정의할 수 없다.
+share_policy:
+  approval_value: "I_ACKNOWLEDGE_SHARE_READY_EXPORT"
+  allowed_scopes:
+    - private
+    - shared
+  allowed_classifications:
+    - business
+    - concept
+    - insight
+    - lecture
+    - person
+    - project
+    - tool

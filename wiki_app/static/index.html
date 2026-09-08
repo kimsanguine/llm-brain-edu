@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM Wiki</title>
+<!-- 폰트는 시스템 것을 쓴다. 이 저장소의 나머지가 전부 "인터넷 없이도 돈다"를 지키는데
+     화면만 CDN 에 기대면, 오프라인 학생은 다른 화면을 보게 된다.
+     한글은 macOS Apple SD Gothic Neo / Windows 맑은 고딕이 기본으로 잡힌다. -->
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">W</span>
+    <span class="brand-name">LLM Wiki</span>
+    <span class="brand-badge">내 머리 속의 두번째 뇌</span>
+  </div>
+  <div class="meta" id="meta">loading…</div>
+</header>
+
+<main id="app">
+  <!-- 초기에 empty state, JS가 검색·결과에 따라 교체 -->
+  <section id="view-empty" class="view view-empty">
+    <h1>무엇을 찾고 계세요?</h1>
+    <p class="subtitle">wiki에 쌓인 페이지에서 검색 · 필요하면 AI에게 추가로 물어보세요.</p>
+    <form id="search-form" class="search-wrap">
+      <input id="search-input" class="search-input" placeholder="에이전트, 관심 분야, hplan ..." autofocus autocomplete="off">
+      <button type="submit" class="search-btn" aria-label="검색">🔍</button>
+    </form>
+    <div class="suggestions">
+      <button class="suggestion" data-q="">전체 인덱스</button>
+    </div>
+    <!-- 내 브레인 대시보드 — 있는 파일만 읽어 "지금까지 무엇을 완성했는가"를 보여준다 -->
+    <div id="brain-dash" class="brain-dash"></div>
+  </section>
+
+  <section id="view-results" class="view view-results hidden">
+    <header class="results-bar">
+      <form id="search-form-2" class="search-wrap-compact">
+        <input id="search-input-2" class="search-input-compact" autocomplete="off">
+      </form>
+      <span id="results-meta" class="results-meta"></span>
+    </header>
+    <div class="results-grid">
+      <aside id="results-list" class="results-list"></aside>
+      <article id="page-view" class="page-view">
+        <div class="page-loading">페이지 선택</div>
+      </article>
+    </div>
+  </section>
+
+  <section id="view-empty-results" class="view view-empty-results hidden">
+    <div class="empty-icon">🤔</div>
+    <h2 id="empty-title">wiki에 직접 매칭되는 페이지가 없어요</h2>
+    <p class="subtitle" id="empty-sub">자연어 질문 같은데, AI가 wiki 전체에서 관련 페이지를 찾아 답변할 수 있어요.</p>
+    <button id="ai-cta-large" class="ai-cta-large">✨ AI에게 물어보기</button>
+  </section>
+</main>
+
+<script src="/app.js" type="module"></script>
+</body>
+</html>

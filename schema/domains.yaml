@@ -1,0 +1,44 @@
+# 도메인 분류 규칙
+# ingest 시 raw 파일을 읽고 아래 기준으로 도메인을 결정한다
+
+domains:
+  AI/LLM:
+    wiki_dirs: [concepts/, tools/]
+    keywords: [LLM, GPT, Claude, Gemini, RAG, LoRA, PEFT, Transformer, Agent, MCP,
+                embedding, fine-tuning, prompt, inference, vLLM, LangChain, LangGraph]
+    sources: [raw/til/, raw/newsletters/, raw/clippings/]
+
+  teaching:
+    wiki_dirs: [lecture/, insights/]
+    keywords: [강의, 수강생, 커리큘럼, 실습, AI Human, 딥러닝, 설명, 개념, 질문, 피드백]
+    sources: [raw/til/, raw/meetings/]
+
+  habix:
+    wiki_dirs: [projects/, business/]
+    keywords: [habix, universe, blog.habix, SEO, GEO, entity, RAG, Producer, Consumer,
+                wiki, 위키, 비즈니스, 제품, 경쟁사, 사용자]
+    sources: [raw/context/, raw/blog/, raw/til/]
+
+  tools:
+    wiki_dirs: [tools/]
+    keywords: [Claude Code, Obsidian, LangGraph, FastAPI, Streamlit, Gradio,
+                Python, Bun, Astro, Cloudflare, MCP, hook, skill]
+    sources: [raw/til/, raw/clippings/]
+
+  personal-projects:
+    wiki_dirs: [projects/, insights/]
+    keywords: [Agent100, hplan, meetflow, shortform, longform, universe, habix_blog,
+                LMI, 공모전, 프로젝트]
+    sources: [raw/til/, raw/meetings/]
+
+# 분류 우선순위: 키워드 매칭 수가 많은 도메인 선택
+# 동점이면 sources 경로 기준으로 결정
+# 하나의 페이지가 복수 도메인에 속할 수 있음 (frontmatter의 domain 배열)
+
+# Cross-domain 연결 허브 노드 (특별 관리)
+hub_nodes:
+  - concepts/retrieval-augmented-generation.md   # AI + habix + teaching
+  - concepts/mcp-model-context-protocol.md       # tools + AI + teaching
+  - projects/habix-universe.md                   # habix + AI + tools
+  - insights/lecture-patterns.md                 # teaching + AI
+  - insights/habix-patterns.md                   # habix + business

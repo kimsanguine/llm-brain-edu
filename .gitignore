@@ -1,0 +1,50 @@
+# 사용자 데이터 — 개인 정보 포함, git 제외
+raw/
+
+# wiki 콘텐츠 — 개인 지식베이스 (사용자마다 다름)
+wiki/
+wiki/.graph_prev.json
+wiki/canvas/
+
+# 개인 설정 — 소스 경로는 사용자마다 다름
+schema/sources.yaml
+# (edu 배포판) schema/config.yaml 은 engine: openai 사전 설정본을 동봉하므로 추적한다
+
+# OKF export 로컬 오버라이드 — 민감 키워드(실명 등)·제외 slug. 커밋 금지
+schema/okf_export.local.yaml
+
+# 시스템 파일
+.DS_Store
+.venv/
+.ingest_state.json
+.sync_state.json
+.launchd.log
+*.pyc
+__pycache__/
+uv.lock
+
+# Obsidian 캐시 (앱 상태 파일은 공유 불필요)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+tools/intro-video/node_modules/
+CLAUDE.local.md
+tools/intro-video/out/
+.playwright-mcp/
+wiki_stats.json
+.access.lock
+.obsidian/community-plugins.json
+.obsidian/plugins/
+.superpowers/
+.worktrees/
+**/docs/
+**/.archive/
+.obsidian/graph.json
+*.canvas
+express/
+
+# Agent Memory OS — 에피소드 원장(운영 맥락, one-way door). 전체 제외, 스키마 예시 1개만 examples/에 커밋
+episodes/
+# 절차 메모리(procedures/)는 git-tracked(공유 워크플로우, US-004 예시 커밋) + OKF 제외 — gitignore 안 함(결정 2026-06-27)
+
+# wiki 목차 — gitignored wiki/의 파생물. business/ 민감 제목 노출 방지로 추적 제외(2026-06-28)
+index.md

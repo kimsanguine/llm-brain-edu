@@ -1,0 +1,16 @@
+# llm-brain-edu — 수업용 기본 설정
+#
+# 이 파일은 그대로 두고 시작하면 됩니다.
+# 키(OPENROUTER_API_KEY)가 없어도 설치는 완료입니다 — 키는 "진짜로 불러보는" 체험에만 씁니다.
+
+llm:
+  # engine: openai → OpenAI 호환 서버(OpenRouter) 호출. 이 과정의 기본값입니다.
+  # engine: cli    → claude -p 재사용 (Claude Code 설치 필요)
+  # engine: api    → Anthropic SDK 직접 호출 (Anthropic 키 필요)
+  engine: openai
+
+  model: openai/gpt-5.6-luna
+  # base_url 한 줄만 바꾸면 회사 내부 LLM 서버(vLLM·Ollama)도 그대로 붙습니다.
+  base_url: https://openrouter.ai/api/v1
+  api_key_env: OPENROUTER_API_KEY
+  max_tokens: 8192
