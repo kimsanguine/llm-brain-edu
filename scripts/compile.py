@@ -99,6 +99,34 @@ def _strip_frontmatter(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _raw_tags(text: str) -> list[str]:
+    """원문 frontmatter 의 tags 를 살린다.
+
+    RULE 경로는 LLM 이 없어 분류를 못 한다. 그래서 학생이 직접 적어 둔 태그가
+    유일한 분류 신호다. 이걸 버리면 위키가 태그도 링크도 없는 평면 더미가 된다.
+    """
+    head = text.lstrip("\ufeff").lstrip()
+    m = re.match(r"^---\s*\n(.*?)\n---", head, flags=re.S)
+    if not m:
+        return []
+    try:
+        meta = yaml.safe_load(m.group(1)) or {}
+    except yaml.YAMLError:
+        return []
+    raw = meta.get("tags") if isinstance(meta, dict) else None
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for x in raw:
+        if isinstance(x, (str, int, float)):
+            t = str(x).strip()
+            if t and t not in out:
+                out.append(t)
+    return out
+
+
 def _page_by_rule(raw_file: Path, text: str) -> tuple[Path, str]:
     """원문을 그대로 옮긴 위키 페이지를 만든다(요약·분류 없음)."""
     body = _strip_frontmatter(text).strip()
@@ -109,12 +137,20 @@ def _page_by_rule(raw_file: Path, text: str) -> tuple[Path, str]:
     slug = _slugify(raw_file.stem)
     today = date.today().isoformat()
     rel_raw = raw_file.relative_to(ROOT).as_posix()
+    tags = _raw_tags(text)
+    tags_line = "tags: [" + ", ".join(_yaml_str(t) for t in tags) + "]\n"
+
+    # 본문이 이미 같은 제목으로 시작하면 한 번만 남긴다(제목이 두 번 찍히는 걸 막는다).
+    if body.startswith("# "):
+        first, _, rest = body.partition("\n")
+        if first[2:].strip() == title:
+            body = rest.lstrip("\n")
 
     page = (
         "---\n"
         f"title: {_yaml_str(title)}\n"
         "type: note\n"
-        "tags: []\n"
+        f"{tags_line}"
         f"created: {today}\n"
         f"updated: {today}\n"
         "sources:\n"

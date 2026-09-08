@@ -55,6 +55,47 @@ def test_rule_path_makes_a_page_without_any_key(sandbox):
     assert "RULE" in page  # 어느 경로로 만들어졌는지 페이지 자신이 밝힌다
 
 
+def test_rule_path_keeps_the_tags_the_student_wrote(sandbox):
+    """원문에 적은 태그가 위키 페이지까지 살아서 간다.
+
+    깨지면: 키가 없는 학생(개강 전 대부분)의 위키가 태그도 링크도 없는 평면
+    더미가 된다. RULE 경로는 LLM 이 없어 분류를 못 하므로, 학생이 직접 적은
+    태그가 유일한 분류 신호다. 이게 버려지면 그래프에 선이 하나도 안 생기고
+    "8주가 쌓이는 게 보인다"는 약속이 첫날부터 깨진다.
+    """
+    f = sandbox / "raw" / "notes" / "2026-09-07-1351-note.md"
+    f.write_text(
+        "---\ndate: 2026-09-07\ntags: [note, marketing, 반복업무]\n---\n\n# 캠페인 정리\n\n본문.",
+        encoding="utf-8",
+    )
+    _, page = compile_mod._page_by_rule(f, f.read_text(encoding="utf-8"))
+    assert '"note"' in page and '"marketing"' in page and '"반복업무"' in page
+    assert "tags: []" not in page
+
+
+def test_rule_path_survives_a_note_without_tags(sandbox):
+    """태그가 없는 메모도 그대로 통과한다.
+
+    깨지면: 태그를 안 적은 학생(대부분의 첫 메모)의 컴파일이 죽는다.
+    """
+    f = sandbox / "raw" / "notes" / "2026-09-07-1352-note.md"
+    f.write_text("---\ndate: 2026-09-07\n---\n\n본문만 있다.", encoding="utf-8")
+    _, page = compile_mod._page_by_rule(f, f.read_text(encoding="utf-8"))
+    assert "tags: []" in page
+    assert "본문만 있다." in page
+
+
+def test_title_is_not_printed_twice(sandbox):
+    """제목이 한 번만 찍힌다.
+
+    깨지면: 모든 위키 페이지에 같은 제목이 두 줄 연속으로 나온다. 기능은
+    안 죽지만 학생이 첫 페이지를 열자마자 "이 도구 대충 만들었네"를 본다.
+    """
+    f = _raw(sandbox, "2026-09-07-1353-note.md", "# 캠페인 정리\n\n본문.")
+    _, page = compile_mod._page_by_rule(f, f.read_text(encoding="utf-8"))
+    assert page.count("# 캠페인 정리") == 1
+
+
 def test_title_with_colon_keeps_frontmatter_parseable(sandbox):
     """제목에 콜론이 있어도 frontmatter 가 깨지지 않는다.
 
