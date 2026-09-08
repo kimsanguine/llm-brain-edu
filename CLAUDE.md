@@ -27,7 +27,12 @@ Claude는 이 시스템의 **컴파일러**다. `raw/` 소스를 읽어 `wiki/`�
 "/ingest ~/path/to/file.pdf [--resonance high]"
 "/ingest '텍스트 내용' [--resonance medium]"
 ```
-`scripts/ingest.py` 실행 → `schema/ingest.md` 규칙 적용 → `wiki/` 생성·갱신 → `index.md` 업데이트
+`scripts/ingest.py` 실행 → `raw/` 에 원본 저장 (여기까지가 ingest 다)
+
+> ⚠️ **교육 배포판(llm-brain-edu)에서는 여기서 끊긴다.** `raw/` → `wiki/` 컴파일은
+> `scripts/compile.py` 를 **따로 실행**해야 한다. 상류 저장소는 Claude Code 슬래시 커맨드가
+> 그 일을 했지만, 교육판은 Claude Code 설치를 전제하지 않으므로 `compile.py` 로 분리했다.
+> 학생이 치는 명령은 `ingest.py` → `compile.py` 두 번이다.
 > 에피소드 자동기록: raw 저장 직후 `episodes/YYYY-MM.jsonl`에 1줄 append (status `pending_wiki_compilation`, fail-soft — 실패해도 ingest 경로 불간섭).
 
 ### curate
@@ -96,9 +101,9 @@ uv run python -m wiki_app
 
 - **검색 알고리즘**: 제목+desc+tags+page_title 점수 매칭 (B). 결과 < 3개 시 본문 grep 자동 확장 (C). 한국어/영문 모두 작동.
 - **AI 답변 토글**: `claude -p` CLI 연결. SSE endpoint는 citation 검증을 위해 bounded buffering 후 한 번에 내보내는 `verified-buffered`이며 UI도 이를 표시. usable trusted claim이 없으면 LLM/stream을 호출하지 않고 `status: abstained`, 출처 `[]`, 안전한 제외 사유 count와 다음 행동 하나를 반환. CLI 부재 시 usable claim이 있는 요청은 `status: unavailable` fallback.
-- **백엔드**: `wiki_app/` (FastAPI · uv) — 6 endpoints (`/api/index`, `/api/search`, `/api/page/{slug}`, `/api/page/{slug}/graph`, `/api/ai-answer`, `/api/ai-answer/stream`)
+- **백엔드**: `wiki_app/` (FastAPI · uv) — 7 endpoints (`/api/dashboard`, `/api/index`, `/api/search`, `/api/page/{slug}`, `/api/page/{slug}/graph`, `/api/ai-answer`, `/api/ai-answer/stream`)
 - **프론트엔드**: `wiki_app/static/` (vanilla JS + Pretendard)
-- **테스트**: `tests/test_wiki_app_*.py` (5 modules, 73 tests)
+- **테스트**: `tests/test_wiki_app_*.py` (8 modules, 108 tests) · 저장소 전체 681 tests
 - **운영 가드레일**: 검색·페이지뷰·AI query는 `raw/`·`wiki/`·`wiki_stats.json`·접근 lock을 변경하지 않음. 접근 기록은 명시적 `curate --record-access PAGE_SLUG`만 사용
 - **에피소드 자동기록**: AI 답변 1건마다 `episodes/YYYY-MM.jsonl`에 append (task_type `ai_answer`, fail-soft — `finally`에서 최종 status 기록, 응답 경로 절대 불간섭)
 - **설계 기준**: `SPEC.md`의 현재 계약을 따른다. 과거 계획 문서는 로컬 비공개 보관소에 있다.
