@@ -11,7 +11,7 @@ Claude는 이 시스템의 **컴파일러**다. `raw/` 소스를 읽어 `wiki/`�
 
 ### 프라이버시 경계 (Agent Memory OS)
 
-- `episodes/` — 운영 맥락(`user_goal`·`inputs`·`outputs` verbatim)을 담는 append-only 원장. **ingest·express·query·curate 4 경로가 자동 기록**(fail-soft). **gitignored** (스키마 예시 1개만 `examples/`에 커밋) — one-way door 누출 방지.
+- `episodes/` — 운영 맥락을 담는 append-only 원장. 교육판의 신규 ingest 기록은 원문·원본 URL 대신 저장된 raw 경로만 남긴다. 다른 경로와 과거 기록에는 verbatim 내용이 남을 수 있다. **ingest·express·query·curate 4 경로가 자동 기록**(fail-soft). **gitignored** (스키마 예시 1개만 `examples/`에 커밋) — one-way door 누출 방지.
 - `index.md` — wiki 목차(gitignored `wiki/`의 파생물). `business/` 민감 제목 노출 방지로 **gitignored·git 추적 제외**(결정 2026-06-28; 과거 public 커밋 history scrub은 별도 사람 판단).
 - `procedures/` — git-tracked이되 **OKF export 제외**(`schema/okf_export.yaml`의 `exclude_paths`).
 - `wiki/memory_health_report.md` — okf `META_FILES`에 등재돼 공개 OKF 번들에서 봉인(미포함).

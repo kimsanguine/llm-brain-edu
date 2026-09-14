@@ -302,15 +302,15 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
         # 같은 판정을 scripts/ingest.py 의 find_unprocessed() 도 한다.
         raw_n = 0
         if (root / "raw").is_dir():
-            done: set[str] = set()
+            from ingest import is_unprocessed
             try:
-                st = json.loads((root / ".ingest_state.json").read_text(encoding="utf-8"))
-                if isinstance(st, dict) and isinstance(st.get("processed"), list):
-                    done = {str(x) for x in st["processed"]}
-            except (json.JSONDecodeError, OSError, TypeError):
-                done = set()
+                state = json.loads((root / ".ingest_state.json").read_text(encoding="utf-8"))
+                if not isinstance(state, dict):
+                    state = {}
+            except (json.JSONDecodeError, OSError):
+                state = {}
             raw_n = sum(1 for f in (root / "raw").rglob("*.md")
-                        if f.relative_to(root).as_posix() not in done)
+                        if is_unprocessed(f, root, state))
         review = sorted(f.name for f in (root / "review").glob("*.md")) if (root / "review").is_dir() else []
 
         # 그래프에 그릴 노드는 연결이 많은 순 60개. 링크도 그 안의 것만 보낸다.
@@ -326,26 +326,27 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
                     if l.get("kind") == "wikilink"
                     and l.get("source") in top_slugs and l.get("target") in top_slugs
                 ]
-                if not links:
-                    # RULE 경로에는 wikilink 가 없다. 그대로 두면 지도가 점만 찍힌
-                    # 화면이 되어 "쌓이고 있다"가 안 보인다. 같은 태그를 단 페이지끼리
-                    # 잇는다. 다만 한 태그를 6개 넘게 단 경우는 잇지 않는다 —
-                    # 모두-모두 연결이 되어 지도가 검게 뭉갠다.
-                    by_tag: dict[str, list[str]] = {}
-                    for l in g2.get("links", []):
-                        if l.get("kind") == "tag" and l.get("source") in top_slugs:
-                            by_tag.setdefault(str(l.get("target")), []).append(str(l["source"]))
-                    seen: set[tuple[str, str]] = set()
-                    for members in by_tag.values():
-                        if len(members) > 6:
-                            continue
-                        for i in range(len(members)):
-                            for j in range(i + 1, len(members)):
-                                pair = (members[i], members[j]) if members[i] < members[j] \
-                                    else (members[j], members[i])
-                                if pair[0] != pair[1] and pair not in seen:
-                                    seen.add(pair)
-                    links = [{"s": a, "t": b} for a, b in sorted(seen)][:120]
+                # wikilink 유무와 관계없이 태그 연결을 보완한다. 그렇지 않으면
+                # 일부 페이지만 이어지고 다른 직무의 메모는 고립된다. 같은 태그를 단 페이지끼리
+                # 잇는다. 다만 한 태그를 6개 넘게 단 경우는 잇지 않는다 —
+                # 모두-모두 연결이 되어 지도가 검게 뭉갠다.
+                by_tag: dict[str, list[str]] = {}
+                for l in g2.get("links", []):
+                    if l.get("kind") == "tag" and l.get("source") in top_slugs:
+                        by_tag.setdefault(str(l.get("target")), []).append(str(l["source"]))
+                seen = {tuple(sorted((l["s"], l["t"]))) for l in links}
+                for members in by_tag.values():
+                    if len(members) > 6:
+                        continue
+                    for i in range(len(members)):
+                        for j in range(i + 1, len(members)):
+                            pair = (members[i], members[j]) if members[i] < members[j] \
+                                else (members[j], members[i])
+                            if pair[0] != pair[1] and pair not in seen:
+                                seen.add(pair)
+                existing = {tuple(sorted((l["s"], l["t"]))) for l in links}
+                links.extend({"s": a, "t": b} for a, b in sorted(seen - existing))
+                links = links[:120]
             except (json.JSONDecodeError, OSError, KeyError, AttributeError, TypeError):
                 links = []
 

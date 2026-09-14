@@ -14,6 +14,7 @@ ingest.py — 미처리 raw/ 파일을 탐지하고 상태를 관리한다.
   python ingest.py --note "..." --force     # 중복(hard dedup) 차단 무시하고 저장 강행
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -120,19 +121,32 @@ def _merge_resonance_frontmatter(content: str, resonance: str) -> str:
     return f"---\nresonance: {resonance}\n---\n\n{content}"
 
 
-def find_unprocessed(priority_only: bool = False) -> list[Path]:
-    """
-    미처리 raw/ 파일 목록을 반환한다.
+def is_unprocessed(file: Path, root: Path, state: dict) -> bool:
+    """처리한 경로라도 마지막 컴파일 이후 내용이 바뀌면 다시 처리한다."""
+    rel = file.relative_to(root).as_posix()
+    compiled = state.get("compiled", {})
+    record = compiled.get(rel) if isinstance(compiled, dict) else None
+    if isinstance(record, dict) and isinstance(record.get("sha256"), str):
+        return file_digest(file) != record["sha256"]
+    # 이전 배포판은 해시가 없으므로 --recompile으로 한 번 기준을 만든다.
+    processed = state.get("processed", [])
+    done = {p.replace("\\", "/") for p in processed if isinstance(p, str)} if isinstance(processed, list) else set()
+    return rel not in done
 
-    priority_only=True이면 frontmatter에 resonance: high 인 파일만 반환한다.
-    """
+
+def file_digest(file: Path) -> str:
+    with file.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def find_unprocessed(priority_only: bool = False) -> list[Path]:
+    """신규 파일과 마지막 컴파일 이후 내용이 바뀐 raw 파일을 반환한다."""
     state = load_state()
-    processed = set(state.get("processed", []))
     files = [
         f for f in sorted(RAW_DIR.rglob("*"))
         if f.is_file()
         and f.suffix.lower() in SUPPORTED_EXTENSIONS
-        and str(f.relative_to(WIKI_ROOT)) not in processed
+        and is_unprocessed(f, WIKI_ROOT, state)
     ]
     if priority_only:
         files = [f for f in files if _get_resonance(f) == "high"]
@@ -297,11 +311,11 @@ def _record_ingest_episode(
         record = {
             "timestamp": datetime.now().astimezone().isoformat(),
             "task_type": task_type,
-            "user_goal": str(source),
-            "inputs": {"source": str(source), "resonance": resonance},
+            "user_goal": "raw 자료 저장",
+            "inputs": {"source": saved.relative_to(WIKI_ROOT).as_posix(), "resonance": resonance},
             "read_pages": [],
             "procedures_used": [],
-            "outputs": {"saved_path": str(saved.relative_to(WIKI_ROOT))},
+            "outputs": {"saved_path": saved.relative_to(WIKI_ROOT).as_posix()},
             "status": "pending_wiki_compilation",
             "notes": "",
         }

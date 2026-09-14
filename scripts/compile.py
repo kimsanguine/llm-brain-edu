@@ -17,6 +17,7 @@
 사용:
     python scripts/compile.py              # raw 미처리분을 컴파일
     python scripts/compile.py --dry-run    # 무엇을 할지만 보여준다
+    python scripts/compile.py --recompile  # 처리 완료 자료도 다시 정리(키가 있으면 API 호출)
     python scripts/compile.py --seed       # 리커버리: 예제 위키를 넣어 화면을 먼저 본다
 """
 from __future__ import annotations
@@ -160,7 +161,7 @@ def _page_by_rule(raw_file: Path, text: str) -> tuple[Path, str]:
         "---\n\n"
         f"# {title}\n\n"
         "> 이 페이지는 **RULE 경로**로 만들어졌습니다. 원문을 그대로 옮겼고 요약·분류·\n"
-        "> 연결은 하지 않았습니다. `OPENROUTER_API_KEY` 를 설정하고 다시 실행하면\n"
+        "> 연결은 하지 않았습니다. `OPENROUTER_API_KEY` 를 설정하고 `compile.py --recompile`을 실행하면\n"
         "> 같은 메모가 어떻게 정리되는지 비교해 볼 수 있습니다.\n\n"
         f"{body}\n"
     )
@@ -317,18 +318,9 @@ def dt_stamp() -> str:
     return datetime.now().strftime("%H%M%S%f")[:10]
 
 
-def _safe_target(out_path: Path, raw_file: Path) -> Path:
-    """기존 페이지를 덮어쓰지 않는다.
-
-    같은 raw 에서 나온 페이지면 갱신이 맞지만(재컴파일), 다른 출처면 학생이 몇 주간
-    쌓아 온 것이다. LIVE 는 모델이 경로를 정하므로 우연히 남의 페이지를 가리킬 수 있다.
-    출처가 다르면 빈 번호를 찾아 새 파일로 만든다 — 사라지는 것보다 두 개가 낫다.
-    """
-    if not out_path.exists():
-        return out_path
-    rel_raw = raw_file.relative_to(ROOT).as_posix()
+def _page_sources(path: Path) -> list[str]:
     try:
-        text = out_path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8")
     except OSError:
         text = ""
     # 본문 전체를 부분문자열로 뒤지면 인용문에 속고, 줄 단위 정규식으로 읽으면
@@ -349,6 +341,30 @@ def _safe_target(out_path: Path, raw_file: Path) -> Path:
                 sources = [str(x) for x in raw_src if isinstance(x, (str, int, float))]
         except yaml.YAMLError:
             sources = []                        # 깨진 frontmatter → 덮지 않는 쪽으로
+    return [x.strip() for x in sources]
+
+
+def _previous_target(raw_file: Path) -> Path | None:
+    """RULE→LIVE 전환 때도 같은 출처의 단일 페이지를 갱신해 이전 본문을 남기지 않는다."""
+    rel = raw_file.relative_to(ROOT).as_posix()
+    for category in CATEGORIES:
+        for page in sorted((WIKI_DIR / category).glob("*.md")):
+            if _page_sources(page) == [rel]:
+                return page
+    return None
+
+
+def _safe_target(out_path: Path, raw_file: Path) -> Path:
+    """기존 페이지를 덮어쓰지 않는다.
+
+    같은 raw 에서 나온 페이지면 갱신이 맞지만(재컴파일), 다른 출처면 학생이 몇 주간
+    쌓아 온 것이다. LIVE 는 모델이 경로를 정하므로 우연히 남의 페이지를 가리킬 수 있다.
+    출처가 다르면 빈 번호를 찾아 새 파일로 만든다 — 사라지는 것보다 두 개가 낫다.
+    """
+    if not out_path.exists():
+        return out_path
+    rel_raw = raw_file.relative_to(ROOT).as_posix()
+    sources = _page_sources(out_path)
     if rel_raw in [x.strip() for x in sources]:
         return out_path                         # 같은 출처 → 갱신
     stem, n = out_path.stem[:80], 2      # 이름 폭주와 ENAMETOOLONG 방지
@@ -365,13 +381,16 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="raw/ 메모를 wiki/ 페이지로 컴파일한다")
     ap.add_argument("--dry-run", action="store_true", help="무엇을 할지만 보여준다")
     ap.add_argument("--seed", action="store_true", help="예제 위키를 넣는다(리커버리)")
+    ap.add_argument("--recompile", action="store_true", help="처리 완료된 raw도 다시 컴파일한다(키가 있으면 API 호출)")
     ap.add_argument("--force", action="store_true", help="--seed 시 기존 위키를 덮어쓴다")
     args = ap.parse_args()
 
     if args.seed:
         return do_seed(args.force)
 
-    files = ingest.find_unprocessed()
+    files = (sorted(f for f in ingest.RAW_DIR.rglob("*")
+                    if f.is_file() and f.suffix.lower() in ingest.SUPPORTED_EXTENSIONS)
+             if args.recompile else ingest.find_unprocessed())
     if not files:
         print("[compile] 새로 정리할 메모가 없습니다.")
         print("  메모를 먼저 넣어 보세요: python scripts/ingest.py --note \"오늘 배운 것\"")
@@ -389,8 +408,10 @@ def main() -> int:
         return 0
 
     written = 0
+    compiled_records: dict = {}
     ok_files: list = []          # 실제로 페이지가 만들어진 raw 만 완료 처리한다
     for f in files:
+        digest = ingest.file_digest(f)
         text = ingest.extract_text(f)
         if not text:
             print(f"   ✗ {f.name}: 내용을 읽지 못해 건너뜁니다")
@@ -410,11 +431,12 @@ def main() -> int:
             result = _page_by_rule(f, text)
 
         out_path, page = result
-        out_path = _safe_target(out_path, f)
+        out_path = _previous_target(f) or _safe_target(out_path, f)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(page, encoding="utf-8")
         written += 1
         ok_files.append(f)
+        compiled_records[f.relative_to(ROOT).as_posix()] = {"sha256": digest}
         print(f"   ✓ {out_path.relative_to(ROOT)}  [{how}]")
 
     total = rebuild_index()
@@ -436,6 +458,8 @@ def main() -> int:
         done = {p.replace("\\", "/") for p in prev if isinstance(p, str)}
     done.update(f.relative_to(ROOT).as_posix() for f in ok_files)
     state["processed"] = sorted(done)
+    previous_records = state.get("compiled")
+    state["compiled"] = {**(previous_records if isinstance(previous_records, dict) else {}), **compiled_records}
     ingest.save_state(state)
 
     failed = len(files) - len(ok_files)

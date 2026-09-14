@@ -36,47 +36,65 @@ notes/       # 메모 7개 (도구 스택 + 마케팅 2 · 행정 2 · 이커머
 > 자기 직무에 가까운 두 편을 먼저 읽어 보세요. 남의 메모라도 "아, 나도 이거 매주 하는데"가
 > 나오면 그게 여러분이 브레인에 넣을 첫 자료입니다.
 
-핵심 개념(**디스커버리·인터뷰·JTBD·리텐션·PRD·우선순위·메트릭**)이 여러 파일에
-일부러 반복 등장하도록 설계돼 있어, 컴파일하면 **개념 페이지 + wikilink 그래프**가
-자연스럽게 만들어집니다.
-
 ## 실습 순서
 
-1. **llm-brain 레포 클론** (설치는 README의 [설치] 참고).
+학생용 설치 안내인 저장소 루트의 `README_수강생용.md`를 따라 `uv sync`와
+`uv run python scripts/doctor.py --fix`를 마친 뒤 진행합니다. Claude Code는 필요하지 않습니다.
+아래 명령은 모두 **저장소 루트**(`llm-brain-edu`)에서 실행합니다.
 
-2. 이 폴더의 내용을 레포의 `raw/`로 복사:
-   ```bash
-   cp -r til clippings meetings notes  ~/<llm-brain 레포>/raw/
-   ```
+### 1. 시드 17편을 raw에 넣기
 
-3. Claude Code 세션에서 **컴파일**:
-   ```
-   /llm-brain:ingest
-   ```
-   → `wiki/`에 개념·도구·인사이트 페이지가 생기고 `[[wikilink]]`로 연결됩니다.
+맥과 리눅스:
 
-4. **질의**해 보기:
-   ```
-   /llm-brain:query "리텐션이 뭐였지?"
-   /llm-brain:query "디스커버리 관련 메모 정리해줘"
-   ```
+```bash
+cp -Rn examples/seed-raw/til examples/seed-raw/clippings examples/seed-raw/meetings examples/seed-raw/notes raw/
+```
 
-5. **그래프·검색 시각화** (로컬 웹):
-   ```bash
-   uv run python -m wiki_app    # → http://localhost:8000
-   ```
+윈도우 PowerShell:
 
-6. **표준 번들로 export** (OKF):
-   ```
-   /llm-brain:okf
-   ```
+```powershell
+foreach ($dir in "til", "clippings", "meetings", "notes") {
+    New-Item -ItemType Directory -Force "raw/$dir" | Out-Null
+    Get-ChildItem "examples/seed-raw/$dir" -File | ForEach-Object {
+        $target = Join-Path "raw/$dir" $_.Name
+        if (-not (Test-Path $target)) { Copy-Item $_.FullName $target }
+    }
+}
+```
 
-## 기대 결과 (체감 포인트)
+같은 이름의 기존 파일은 덮어쓰지 않습니다. `examples/seed-raw/README.md` 자체는
+실습 자료가 아니므로 복사하지 않습니다.
 
-11개의 흩어진 메모가 →
-- `concepts/` 디스커버리·JTBD·리텐션·PRD·우선순위·메트릭 …
-- `tools/` Notion·Figma·Linear·Amplitude
-- `insights/` 반복 패턴(예: "인터뷰는 솔루션이 아니라 문제를 묻는다")
-- 으로 **연결된 지식 그래프**가 됩니다. 이게 세컨드 브레인의 *aha* 지점입니다.
+### 2. 위키 만들기
 
-> 자기 자료가 생기면 같은 방식으로 `raw/`에 넣고 `/llm-brain:ingest`만 하면 됩니다.
+```bash
+uv run python scripts/compile.py
+```
+
+키가 없으면 RULE 경로로 실행됩니다. 원문과 태그를 보존한 페이지를 만들며,
+AI 요약이나 도메인 분류는 하지 않습니다. 키가 있으면 LIVE 경로로 자료가 외부 AI에
+전송됩니다. 키를 넣어 다시 정리하려면 학생용 안내의 `--recompile` 절차를 따르세요.
+
+### 3. 검색과 지도 확인하기
+
+```bash
+uv run python -m wiki_app
+```
+
+터미널에 출력된 주소를 브라우저로 엽니다. 기본 포트가 사용 중이면 다음 빈 포트를 씁니다.
+검색창에 `마케팅`, `연구비`, `CS`를 입력하고 각 직무의 두 메모를 확인하세요.
+지도에는 문서의 직접 링크와 같은 태그를 공유하는 페이지 연결이 함께 표시됩니다.
+
+## 기대 결과
+
+빈 브레인에 시드만 넣어 RULE로 실행했을 때:
+
+- 위키 페이지 **17개**, 카테고리는 모두 `concepts/`
+- 원본 그래프 **50개 링크**: 문서 간 wikilink 1개와 문서→태그 링크 49개
+- 대시보드의 미처리 RAW **0개**
+- 지도에서는 태그를 페이지 간 연결로 바꿔 보여주므로 선 개수는 원본의 50개와 다릅니다.
+  하나의 태그를 7개 이상이 공유하면 그 태그는 지도 연결에서 제외합니다.
+
+개인 메모가 이미 있으면 수치는 더 커질 수 있습니다. RULE에서는 원문을 옮기므로
+`tools/`나 `insights/`로 자동 분류된다는 뜻이 아닙니다. 실제 개인정보가 없는
+내 메모를 추가하면서, 시드와 내 기록의 검색 결과를 비교하세요.

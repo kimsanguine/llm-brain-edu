@@ -53,7 +53,7 @@ def test_ingest_note_records_pending_episode(tmp_raw, monkeypatch):
     rec = captured["record"]
     assert rec["task_type"] == "ingest_note"
     assert rec["status"] == "pending_wiki_compilation"
-    assert rec["inputs"]["source"] == "RAG 메모"
+    assert rec["inputs"]["source"] == rec["outputs"]["saved_path"]
     assert rec["inputs"]["resonance"] == "high"
     assert rec["read_pages"] == []
     assert rec["procedures_used"] == []
@@ -74,7 +74,7 @@ def test_ingest_file_records_pending_episode(tmp_raw, monkeypatch):
     rec = captured["record"]
     assert rec["task_type"] == "ingest_file"
     assert rec["status"] == "pending_wiki_compilation"
-    assert rec["inputs"]["source"] == str(src)
+    assert rec["inputs"]["source"] == rec["outputs"]["saved_path"]
     assert rec["inputs"]["resonance"] is None  # --resonance 미지정 → null
     assert rec["outputs"]["saved_path"].startswith("raw/docs/")
 
