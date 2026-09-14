@@ -650,3 +650,28 @@ def test_context_cli_rejects_legacy_claim_from_mixed_source_page_without_writes(
     assert "raw/notes/trusted.md" not in result.stderr
     assert "External capture statement" not in result.stderr
     assert after == before
+
+
+def test_recommended_build_command_discovers_all_pages(tmp_path):
+    root = _build_project(tmp_path)
+    for slug in ("alpha", "beta"):
+        _write(root / "raw" / "notes" / f"{slug}.md", f"{slug} current fact.\n")
+        _write(root / "wiki" / "concepts" / f"{slug}.md", _wiki_page(
+            title=slug, source=f"raw/notes/{slug}.md", body=f"{slug} current fact."))
+    _write(root / "wiki" / "index.md", "Metadata is not a claim page.")
+    result = subprocess.run([sys.executable, str(_REPO_ROOT / "scripts/claims.py"), "build"],
+                            cwd=root, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    records = claim_ledger.read_claims_jsonl(root / "claims.jsonl")
+    assert {claim_ledger.claim_slug(r) for r in records} == {"alpha", "beta"}
+
+
+def test_empty_auto_build_preserves_existing_ledger(tmp_path):
+    root = _build_project(tmp_path)
+    ledger = root / "claims.jsonl"
+    ledger.write_text("existing ledger", encoding="utf-8")
+    result = subprocess.run([sys.executable, str(_REPO_ROOT / "scripts/claims.py"), "build"],
+                            cwd=root, capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "no wiki pages" in result.stderr
+    assert ledger.read_text() == "existing ledger"

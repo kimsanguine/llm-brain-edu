@@ -260,6 +260,13 @@ def write_claims_jsonl(
         temp_path.unlink(missing_ok=True)
 
 
+def wiki_page_slugs(wiki_root: Path) -> list[str]:
+    """Discover only supported claim pages, excluding root-level generated metadata."""
+    return sorted({page.relative_to(Path(wiki_root) / category).with_suffix("").as_posix()
+                   for category in _CATEGORIES
+                   for page in (Path(wiki_root) / category).rglob("*.md") if page.is_file()})
+
+
 def _find_page_path(slug: str, wiki_root: Path) -> Path | None:
     for category in _CATEGORIES:
         candidate = wiki_root / category / f"{slug}.md"

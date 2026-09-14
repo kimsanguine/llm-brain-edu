@@ -17,7 +17,7 @@ def _parser() -> argparse.ArgumentParser:
     build = subparsers.add_parser("build", help="explicitly rebuild claims.jsonl from wiki + raw")
     build.add_argument("--wiki-root", type=Path, default=Path("wiki"))
     build.add_argument("--ledger", type=Path, default=Path("claims.jsonl"))
-    build.add_argument("--slug", action="append", required=True)
+    build.add_argument("--slug", action="append", help="limit rebuild to these slugs; defaults to all wiki pages")
 
     context = subparsers.add_parser("context", help="read and render query context without writes")
     context.add_argument("--wiki-root", type=Path, default=Path("wiki"))
@@ -31,8 +31,11 @@ def main(argv: list[str] | None = None) -> int:
     project_root = args.wiki_root.resolve().parent
     try:
         if args.command == "build":
+            slugs = args.slug if args.slug else claim_ledger.wiki_page_slugs(args.wiki_root)
+            if not slugs:
+                raise claim_ledger.ClaimLedgerError("no wiki pages; run scripts/compile.py first")
             records = claim_ledger.build_claim_ledger(
-                args.slug, wiki_root=args.wiki_root, now=date.today()
+                slugs, wiki_root=args.wiki_root, now=date.today()
             )
             claim_ledger.write_claims_jsonl(
                 args.ledger, records, project_root=project_root
