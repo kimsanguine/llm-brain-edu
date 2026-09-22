@@ -1,6 +1,8 @@
-# llm-brain — Claude Code 운영 지침
+# llm-brain — Claude Code 선택 호환 지침
 
-Claude는 이 시스템의 **컴파일러**다. `raw/` 소스를 읽어 `wiki/`를 생성·갱신하고, 사용자 질문에 wiki 기반으로 답한다.
+수업의 표준 에이전트는 Codex이며, 공통 운영 규칙의 정본은 AGENTS.md다. Claude Code를 사용하는 경우에도 먼저 AGENTS.md를 읽고 동일한 가드레일을 따른다.
+
+이 파일과 commands/는 기존 Claude Code 사용자를 위한 선택 호환 경로다. Claude는 raw 소스를 읽어 wiki를 생성·갱신하고, 사용자 질문에는 wiki 기반으로만 답한다.
 
 ## 가드레일 (절대 위반 금지)
 
