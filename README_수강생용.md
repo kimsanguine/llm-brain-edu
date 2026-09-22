@@ -57,6 +57,14 @@ cd llm-brain-edu
 > [저장소 페이지](https://github.com/kimsanguine/llm-brain-edu)에서 **Code → Download ZIP** 으로
 > 받아 압축을 풀고, 그 폴더로 들어가면 됩니다.
 
+**폴더를 받았으면 Codex로 엽니다.** 이 수업에서는 **Codex**를 코드 작업을 돕는 AI로 사용합니다.
+Codex가 아직 없다면 [Codex 설치·키 연결 가이드](https://likelion.habix.ai/likelion/10th?view=setup)를
+먼저 따라 하세요. Codex에서 방금 받은 `llm-brain-edu` 폴더를 연 뒤 아래처럼 요청합니다.
+
+> AGENTS.md를 읽고 따라 주세요. 지금은 수업용 llm-brain을 설치하고, 내가 실행할 터미널 명령과 성공 기준을 한 단계씩 안내해 주세요.
+
+Codex는 명령을 대신 실행할 수 있어도, 수업에서는 각 명령의 결과를 여러분이 터미널과 브라우저에서 직접 확인합니다.
+
 ### 2단계. 준비물 설치 (5분)
 
 브레인은 **파이썬**이라는 컴퓨터 언어로 만들어져 있습니다. 파이썬을 직접 설치하는 건

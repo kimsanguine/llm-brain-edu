@@ -10,12 +10,14 @@
 
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Claude Code](https://img.shields.io/badge/Claude_Code-CLI-orange)
+![Codex](https://img.shields.io/badge/Codex-course_standard-111111)
 ![Obsidian](https://img.shields.io/badge/Obsidian-Graph_View-7C3AED)
 ![Version](https://img.shields.io/badge/version-0.3.0-blue)
 
 > 🎉 **v0.3** — Quality-Driven Curation: 매일 품질 점검·자동 보강(`curate --reweave`) · 신규 페이지 승격 게이트(Promotion Gates) · 여러 메모를 교차 종합(synthesis)하고 모순을 명시적으로 화해 · 입구에서 중복 차단(hard dedup) · cli/api 엔진 선택(`llm_client`).
-> 🎉 **v0.2** — Agent Memory OS 5층 기억(작업·에피소드·의미·절차·메타) + 설치 점검 `/llm-brain:doctor` · 웹 UI `/llm-brain:wikiweb` 커맨드 추가.
+> 🎉 **v0.2** — Agent Memory OS 5층 기억(작업·에피소드·의미·절차·메타) + 설치 점검과 웹 UI 추가.
+
+> **수업 도구 원칙:** 수강생의 필수 작업 도구는 Codex입니다. 위키를 실제로 정리·답변하는 런타임은 OpenRouter API를 사용하며, Claude Code 플러그인은 기존 사용자를 위한 **선택 호환** 경로입니다. Codex 수강생은 [README_수강생용.md](README_수강생용.md)부터 시작하세요.
 
 ---
 
@@ -48,10 +50,9 @@
 
 ## 준비물 *Prerequisites*
 
-비전공자도 따라 할 수 있게, 필요한 **세 가지**를 하나씩 풀어 둔다.
+비전공자도 따라 할 수 있게, 필요한 세 가지를 하나씩 풀어 둔다.
 
-**1. Claude Code** — 터미널에서 대화로 코드를 다뤄 주는 AI 도구. 이 위키의 'AI 컴파일러' 역할을 한다.
-설치·안내(공식): <https://docs.claude.com/claude-code>
+**1. Codex** — 프로젝트 폴더의 AGENTS.md를 읽고, 파일 작업과 명령 실행을 도와 주는 수업의 표준 AI 도구다.
 
 **2. uv** — 파이썬을 알아서 설치·실행해 주는 도구(복잡한 파이썬 환경 설정을 대행). 터미널에 아래 한 줄을 입력하면 설치된다:
 
@@ -67,40 +68,36 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ### 명령을 어디에 입력하나 *Where to type*
 
-이 문서에는 두 종류의 명령이 섞여 나온다 — **입력하는 곳이 다르다.**
+이 문서에는 두 종류의 명령이 섞여 나온다. 입력하는 곳이 다르다.
 
-- `/llm-brain:...` 처럼 **슬래시로 시작**하는 명령 → **Claude Code 입력창**(대화창)에 입력
+- Codex에 하는 자연어 요청 → Codex 대화창에 입력. 먼저 AGENTS.md를 읽도록 요청한다.
 - `uv run ...` · `git clone ...` · `cp ...` 같은 명령 → **터미널**(명령줄, 곧 CLI)에 입력
   - 💡 터미널 여는 법: macOS는 `⌘+Space` → `Terminal` 검색 → 실행. (Windows는 `PowerShell`.)
 
-> 아래 모든 코드 블록 옆에 ▶ 표시로 "어디에 입력하는지"를 적어 둔다.
+> 아래의 Claude 슬래시 명령 예시는 기존 플러그인 사용자를 위한 선택 호환 문서다. 수업에서는 같은 일을 Codex에 자연어로 요청하거나, 제시된 Python 명령을 터미널에서 실행한다.
 
 ---
 
 ## 설치 *Install*
 
-▶ **Claude Code 입력창**에 입력 — 플러그인으로 설치한다:
+▶ **터미널**에서 저장소를 내려받고 Codex로 연다:
 
+```bash
+git clone https://github.com/kimsanguine/llm-brain-edu.git
+cd llm-brain-edu
 ```
-/plugin marketplace add kimsanguine/llm-brain
-/plugin install llm-brain@llm-brain
-```
 
-설치하면 컴파일러 커맨드가 추가된다 — `/llm-brain:ingest`·`/llm-brain:curate`·`/llm-brain:express`·`/llm-brain:query`·`/llm-brain:okf` · 설치 점검 `/llm-brain:doctor` · 웹 UI `/llm-brain:wikiweb`.
+Codex에 다음처럼 요청한다.
 
-> 자기 지식 데이터를 다루려면 레포를 클론해 `raw/` 소스를 등록한다(아래 [빠른 시작](#빠른-시작-quick-start)). 플러그인은 *컴파일러 커맨드*를, 클론은 *자기 데이터*를 제공한다.
+> AGENTS.md를 읽고 따라 주세요. 이 저장소의 설치 상태를 점검하고, 내가 다음으로 실행할 명령과 성공 기준을 한 단계씩 안내해 주세요.
+
+Claude Code 플러그인과 `/llm-brain:...` 명령은 기존 사용자를 위한 선택 호환 경로로 유지한다.
 
 ---
 
 ## 빠른 시작 *Quick Start*
 
-[설치](#설치-install)로 커맨드를 받은 뒤, 레포를 클론한다:
-
-▶ **터미널**에 입력:
-
-```bash
-git clone https://github.com/kimsanguine/llm-brain.git && cd llm-brain
-```
+[설치](#설치-install)에서 받은 `llm-brain-edu` 폴더 안에서 시작한다.
 
 아직 파일을 만들거나 개인 소스를 읽지 않고 운영 방식을 먼저 고르려면:
 
@@ -268,7 +265,7 @@ uv run python -m wiki_app
 
 스크린샷: `assets/screenshots/dod-*.png`
 
-> AI 답변은 `claude -p` CLI(명령줄 도구)로 라이브 동작한다. SSE 연결을 사용하지만 citation 검증 전 토큰은 내보내지 않고, 출력 상한 안에서 전부 버퍼링한 뒤 검증된 결과를 한 번에 보내는 `verified-buffered` 방식이다. UI도 이 전달 방식을 표시한다. Claude Code 미설치 시 `status: unavailable`로 graceful 처리(없으면 조용히 비활성). **v0.3:** `schema/config.yaml`의 `llm.engine`을 `cli`(기본, Claude Code) 또는 `api`(anthropic SDK)로 선택할 수 있다 — 무인 배치·서버 환경 대비.
+> AI 답변은 `schema/config.yaml`의 LLM 엔진으로 라이브 동작한다. 수업 기본값은 OpenRouter API의 `openai` 엔진이며, API 키가 없으면 AI 답변은 사용할 수 없지만 RULE 경로의 설치·검색 실습은 계속된다. SSE 연결은 citation 검증 전 토큰을 내보내지 않고, 검증된 결과를 한 번에 보내는 `verified-buffered` 방식이다. `cli`(Claude Code)와 `api`(Anthropic)는 기존 사용자를 위한 선택 호환 엔진이다.
 
 ---
 
@@ -392,14 +389,17 @@ C apture  →  O rganize  →  D istill  →  E xpress
 ```yaml
 # schema/config.yaml
 llm:
-  engine: cli   # Claude Code CLI 재사용 — API 키 불필요
-  # engine: api # Anthropic API 직접 호출
+  engine: openai  # 수업 기본값: OpenRouter API
+  model: openai/gpt-5.6-luna
+  base_url: https://openrouter.ai/api/v1
+  api_key_env: OPENROUTER_API_KEY
 ```
 
 | 모드 | 비용 | 조건 |
 |---|---|---|
-| `cli` (기본) | 토큰 비용 없음 | Claude Code 설치 필요 |
-| `api` | API 과금 | `ANTHROPIC_API_KEY` 필요 |
+| `openai` (수업 기본) | API 과금 | `OPENROUTER_API_KEY` 필요 |
+| `cli` (선택 호환) | 별도 CLI 사용 조건에 따름 | Claude Code 설치 필요 |
+| `api` (선택 호환) | API 과금 | `ANTHROPIC_API_KEY` 필요 |
 
 ---
 
@@ -420,9 +420,10 @@ llm-brain/
 
 ```
 llm-brain/
-├── .claude-plugin/            # 플러그인 manifest (marketplace.json + plugin.json)
-├── commands/                  # 슬래시 커맨드 (/llm-brain:ingest·curate·express·query·okf)
-├── CLAUDE.md                  # Claude Code 운영 가이드
+├── AGENTS.md                  # Codex 기준 공통 운영 가이드
+├── .claude-plugin/            # 선택 호환 플러그인 manifest
+├── commands/                  # 선택 호환 슬래시 커맨드
+├── CLAUDE.md                  # Claude Code 선택 호환 지침
 ├── SPEC.md                    # 기술 명세서
 ├── README.md
 ├── pyproject.toml
