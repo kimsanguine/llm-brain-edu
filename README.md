@@ -97,13 +97,7 @@ Claude Code 플러그인과 `/llm-brain:...` 명령은 기존 사용자를 위�
 
 ## 빠른 시작 *Quick Start*
 
-[설치](#설치-install) 후, 레포를 클론한다:
-
-▶ **터미널**에 입력:
-
-```bash
-git clone https://github.com/kimsanguine/llm-brain-edu.git && cd llm-brain-edu
-```
+[설치](#설치-install)에서 받은 `llm-brain-edu` 폴더 안에서 시작한다.
 
 아직 파일을 만들거나 개인 소스를 읽지 않고 운영 방식을 먼저 고르려면:
 
