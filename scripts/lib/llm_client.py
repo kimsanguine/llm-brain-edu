@@ -39,10 +39,11 @@ DEFAULT_API_KEY_ENV = "ANTHROPIC_API_KEY"
 DEFAULT_MAX_TOKENS = 8192
 
 # --- openai 엔진 기본값 (OpenAI 호환 서버) ---
-# base_url 한 줄만 바꾸면 OpenRouter·vLLM·Ollama·Azure OpenAI 어디든 붙는다.
-DEFAULT_OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_OPENAI_API_KEY_ENV = "OPENROUTER_API_KEY"
-DEFAULT_OPENAI_MODEL = "openai/gpt-5.6-luna"
+# 수업 기본은 OpenAI API. base_url 한 줄만 바꾸면 vLLM·Ollama·Azure OpenAI 같은
+# OpenAI 호환 서버에도 붙는다.
+DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
+DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
 # 비스트림 기본 timeout(초) — cli/api 공통 fallback. wiki_app 은 자기 상수
 # (_AI_ANSWER_TIMEOUT)를 주입한다. api 도 동일 계약으로 이 deadline 을 적용한다.
@@ -135,7 +136,7 @@ def load_llm_config(config_file: Path | None = None) -> dict:
 def _apply_openai_defaults(cfg: dict) -> None:
     """engine=openai 인데 anthropic 쪽 기본값이 남아 있으면 교정한다.
 
-    model 을 적지 않은 학생이 Anthropic 모델명으로 OpenRouter 를 호출해 조용히 404 를
+    model 을 적지 않은 학생이 Anthropic 모델명으로 OpenAI API 를 호출해 조용히 404 를
     받는 일이 없어야 한다. 교정했다는 사실은 stderr 로 알린다(조용한 실패 금지, Rule 8).
     """
     if cfg.get("model") == DEFAULT_MODEL:

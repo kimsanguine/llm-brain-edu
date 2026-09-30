@@ -1,6 +1,6 @@
 """test_llm_client_openai — openai 엔진(OpenAI 호환 서버) 유닛 테스트.
 
-llm-brain-edu 델타 §5. 실제 OpenRouter 를 부르지 않는다 —
+llm-brain-edu 델타 §5. 실제 API 를 부르지 않는다 —
 `llm_client._import_openai` 를 fake 모듈로 mock 한다.
 
 각 테스트는 "이게 깨지면 수강생에게 무슨 일이 일어나는가"를 주석으로 남긴다.
@@ -19,7 +19,6 @@ import pytest  # noqa: E402
 from lib import llm_client  # noqa: E402
 from lib.llm_client import (  # noqa: E402
     DEFAULT_OPENAI_API_KEY_ENV,
-    DEFAULT_OPENAI_BASE_URL,
     DEFAULT_OPENAI_MODEL,
     LLMError,
     call_llm,
@@ -75,7 +74,7 @@ def fake_openai(monkeypatch):
     def _install(create):
         fake = FakeOpenAI(create)
         monkeypatch.setattr(llm_client, "_import_openai", lambda: fake)
-        monkeypatch.setenv(DEFAULT_OPENAI_API_KEY_ENV, "sk-or-test")
+        monkeypatch.setenv(DEFAULT_OPENAI_API_KEY_ENV, "sk-test")
         return fake
 
     return _install
@@ -112,14 +111,27 @@ def test_missing_openai_package_tells_student_the_fix(monkeypatch):
 def test_missing_key_names_the_exact_env_var(fake_openai, monkeypatch):
     """키 부재 → 어느 환경변수인지 이름을 찍어야 한다.
 
-    깨지면: 교안이 `OPENROUTER_API_KEY` 를 쓰라고 했는데 에러가 이름을 안 알려주면
+    깨지면: 교안이 `OPENAI_API_KEY` 를 쓰라고 했는데 에러가 이름을 안 알려주면
     학생은 자기가 만든 변수명이 틀렸는지조차 확인할 수 없다.
     """
     fake_openai(lambda **kw: _resp("x"))
-    monkeypatch.delenv(DEFAULT_OPENAI_API_KEY_ENV, raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(LLMError) as exc:
         asyncio.run(call_llm("q", config=OPENAI_CFG))
-    assert DEFAULT_OPENAI_API_KEY_ENV in str(exc.value)
+    assert "OPENAI_API_KEY" in str(exc.value)
+
+
+def test_missing_key_names_the_configured_env_var_not_the_default(fake_openai, monkeypatch):
+    """config 가 다른 키 이름을 정하면 에러도 그 이름을 알려 준다.
+
+    깨지면: 사내 서버용으로 `api_key_env` 를 바꾼 학생이 기본값 이름을 보고
+    엉뚱한 변수를 설정한다.
+    """
+    fake_openai(lambda **kw: _resp("x"))
+    monkeypatch.delenv("TEAM_LLM_KEY", raising=False)
+    with pytest.raises(LLMError) as exc:
+        asyncio.run(call_llm("q", config={"engine": "openai", "api_key_env": "TEAM_LLM_KEY"}))
+    assert "TEAM_LLM_KEY" in str(exc.value)
 
 
 def test_empty_choices_is_surfaced_not_returned_as_blank(fake_openai):
@@ -138,25 +150,29 @@ def test_empty_choices_is_surfaced_not_returned_as_blank(fake_openai):
 # ---------------------------------------------------------------------------
 
 
-def test_engine_openai_without_model_uses_openrouter_model(tmp_path, capsys):
-    """engine 만 openai 로 적고 model 을 빠뜨려도 Anthropic 모델명이 남지 않는다.
+def test_engine_openai_without_model_uses_openai_api_defaults(tmp_path, capsys):
+    """engine 만 openai 로 적어도 수업 기본값(OpenAI API 키 이름·주소·모델)으로 채운다.
 
-    깨지면: `claude-opus-4-8` 을 OpenRouter 로 보내 404 가 나고, 학생은 자기 키가
-    잘못된 줄 안다. 교정 사실은 stderr 로 알려 조용한 치환도 막는다.
+    깨지면: `claude-opus-4-8` 이나 `openai/...` 같은 중계 서비스식 모델명을 OpenAI 로
+    보내 404 가 나고, 학생은 자기 키가 잘못된 줄 안다. 키 이름이 수업 안내
+    (`OPENAI_API_KEY`)와 다르면 키를 넣고도 RULE 경로에 머문다.
+    교정 사실은 stderr 로 알려 조용한 치환도 막는다.
     """
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text("llm:\n  engine: openai\n", encoding="utf-8")
     cfg = load_llm_config(cfg_file)
+    assert cfg["api_key_env"] == "OPENAI_API_KEY"
+    assert cfg["base_url"] == "https://api.openai.com/v1"
     assert cfg["model"] == DEFAULT_OPENAI_MODEL
-    assert cfg["api_key_env"] == DEFAULT_OPENAI_API_KEY_ENV
-    assert cfg["base_url"] == DEFAULT_OPENAI_BASE_URL
+    assert not cfg["model"].startswith("claude")
+    assert "/" not in cfg["model"]  # OpenAI API 는 `제공자/모델` 형식을 받지 않는다
     assert "engine=openai" in capsys.readouterr().err
 
 
 def test_explicit_model_and_base_url_win(tmp_path):
     """학생/강사가 명시한 값은 교정이 덮어쓰지 않는다.
 
-    깨지면: 사내 LLM 서버(base_url 교체)로 돌리려는 설정이 OpenRouter 로 되돌아간다.
+    깨지면: 사내 LLM 서버(base_url 교체)로 돌리려는 설정이 OpenAI 기본 주소로 되돌아간다.
     """
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text(
@@ -169,6 +185,16 @@ def test_explicit_model_and_base_url_win(tmp_path):
     cfg = load_llm_config(cfg_file)
     assert cfg["model"] == "qwen/qwen3-max"
     assert cfg["base_url"] == "http://localhost:8000/v1"
+
+
+def test_custom_base_url_reaches_the_sdk(fake_openai):
+    """config 로 바꾼 base_url 이 실제 SDK 호출까지 전달된다.
+
+    깨지면: 사내 서버 주소를 적어도 요청이 OpenAI 로 나가, 사내 자료가 밖으로 전송된다.
+    """
+    fake = fake_openai(lambda **kw: _resp("x"))
+    asyncio.run(call_llm("q", config={"engine": "openai", "base_url": "http://localhost:8000/v1"}))
+    assert fake.last_base_url == "http://localhost:8000/v1"
 
 
 def test_openai_engine_is_accepted_not_downgraded_to_cli(tmp_path, capsys):
@@ -191,13 +217,13 @@ def test_openai_engine_is_accepted_not_downgraded_to_cli(tmp_path, capsys):
 def test_returns_text_and_sends_base_url_and_key(fake_openai):
     """base_url 이 실제로 SDK 에 전달돼야 한다.
 
-    깨지면: OpenRouter 키를 들고 OpenAI 본사로 요청이 가서 401 이 난다.
+    깨지면: OpenAI API 키를 들고 다른 서버로 요청이 가서 401 이 난다.
     """
     fake = fake_openai(lambda **kw: _resp("  안녕하세요  "))
     out = asyncio.run(call_llm("q", config=OPENAI_CFG))
     assert out == "안녕하세요"
-    assert fake.last_base_url == DEFAULT_OPENAI_BASE_URL
-    assert fake.last_api_key == "sk-or-test"
+    assert fake.last_base_url == "https://api.openai.com/v1"
+    assert fake.last_api_key == "sk-test"
     assert fake.last_kwargs["model"] == DEFAULT_OPENAI_MODEL
 
 

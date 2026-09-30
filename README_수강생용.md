@@ -125,7 +125,7 @@ uv run python scripts/doctor.py
 두 번째 명령의 마지막 줄이 이렇게 나오면 성공입니다.
 
 ```
-  ⚠️ openrouter-key: OPENROUTER_API_KEY 없음 — 없어도 설치는 완료입니다(RULE 경로로 동작)
+  ⚠️ openai-key: OPENAI_API_KEY 없음 — 없어도 설치는 완료입니다(RULE 경로로 동작)
 
 요약: ✅ 40 · ⚠️ 1 · ❌ 0
 ✅ 설치 정상. (⚠️ 항목은 선택/환경별 — 필요 시 안내대로)
@@ -181,7 +181,7 @@ uv run python scripts/compile.py
 
 ```
 [compile] 메모 3건 → 위키 컴파일
-  경로: RULE (OPENROUTER_API_KEY 없음 — 원문을 그대로 옮깁니다)
+  경로: RULE (OPENAI_API_KEY 없음 — 원문을 그대로 옮깁니다)
    ✓ wiki/concepts/2026-09-07-1358-note-2.md  [RULE]
    ✓ wiki/concepts/2026-09-07-1358-note-3.md  [RULE]
    ✓ wiki/concepts/2026-09-07-1358-note.md  [RULE]
@@ -242,24 +242,26 @@ uv run python -m wiki_app
 
 키를 넣으면 `LIVE` 경로가 되어, **AI가 요약하고 분류하고 관련 페이지끼리 연결**해 줍니다.
 
+키는 OpenAI API 키를 씁니다. [OpenAI API keys 페이지](https://platform.openai.com/api-keys)에서 발급합니다.
+
 ```bash
 # 맥·리눅스
-echo 'export OPENROUTER_API_KEY="발급받은키"' >> ~/.zshrc
+echo 'export OPENAI_API_KEY="발급받은키"' >> ~/.zshrc
 
 # 윈도우
-setx OPENROUTER_API_KEY "발급받은키"
+setx OPENAI_API_KEY "발급받은키"
 ```
 
 **새 터미널을 열어야** 적용됩니다. 키 값을 화면에 출력하지 말고 설정 여부만 확인하세요.
 
 ```bash
 # 맥·리눅스
-printenv OPENROUTER_API_KEY >/dev/null && echo "설정됨" || echo "미설정"
+printenv OPENAI_API_KEY >/dev/null && echo "설정됨" || echo "미설정"
 ```
 
 ```powershell
 # 윈도우 PowerShell
-if ($env:OPENROUTER_API_KEY) { "설정됨" } else { "미설정" }
+if ($env:OPENAI_API_KEY) { "설정됨" } else { "미설정" }
 ```
 
 같은 메모를 LIVE 경로로 다시 정리하려면 아래 명령을 실행합니다.
@@ -345,8 +347,8 @@ AI 서비스로 전송됩니다.** 요약과 분류를 AI 가 하기 때문입�
 ### 이전 버전에 민감정보를 넣었다면
 
 1. 웹 화면과 자동 수집 프로그램을 종료합니다. 정리하는 동안 키를 해제해 자료가
-   다시 전송되지 않도록 합니다(맥: `unset OPENROUTER_API_KEY`, PowerShell:
-   `Remove-Item Env:OPENROUTER_API_KEY -ErrorAction SilentlyContinue`).
+   다시 전송되지 않도록 합니다(맥: `unset OPENAI_API_KEY`, PowerShell:
+   `Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue`).
 2. 해당 `raw/` 파일을 로컬 편집기로 열어 민감값을 지웁니다. 파일명에 값이 있으면
    파일명도 바꾸고, 기존 파일명과 연결된 위키 페이지를 따로 확인합니다.
 3. `episodes/`의 해당 월 `YYYY-MM.jsonl`을 로컬 편집기로 엽니다. 한 줄이 한 기록입니다.

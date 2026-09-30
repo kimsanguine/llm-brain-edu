@@ -17,7 +17,7 @@
 > 🎉 **v0.3** — Quality-Driven Curation: 매일 품질 점검·자동 보강(`curate --reweave`) · 신규 페이지 승격 게이트(Promotion Gates) · 여러 메모를 교차 종합(synthesis)하고 모순을 명시적으로 화해 · 입구에서 중복 차단(hard dedup) · cli/api 엔진 선택(`llm_client`).
 > 🎉 **v0.2** — Agent Memory OS 5층 기억(작업·에피소드·의미·절차·메타) + 설치 점검과 웹 UI 추가.
 
-> **수업 도구 원칙:** 수강생의 필수 작업 도구는 Codex입니다. 위키를 실제로 정리·답변하는 런타임은 OpenRouter API를 사용하며, Claude Code 플러그인은 기존 사용자를 위한 **선택 호환** 경로입니다. Codex 수강생은 [README_수강생용.md](README_수강생용.md)부터 시작하세요.
+> **수업 도구 원칙:** 수강생의 필수 작업 도구는 Codex입니다. 위키를 실제로 정리·답변하는 런타임은 OpenAI API를 사용하며, Claude Code 플러그인은 기존 사용자를 위한 **선택 호환** 경로입니다. Codex 수강생은 [README_수강생용.md](README_수강생용.md)부터 시작하세요.
 
 ---
 
@@ -265,7 +265,7 @@ uv run python -m wiki_app
 
 스크린샷: `assets/screenshots/dod-*.png`
 
-> AI 답변은 `schema/config.yaml`의 LLM 엔진으로 라이브 동작한다. 수업 기본값은 OpenRouter API의 `openai` 엔진이며, API 키가 없으면 AI 답변은 사용할 수 없지만 RULE 경로의 설치·검색 실습은 계속된다. SSE 연결은 citation 검증 전 토큰을 내보내지 않고, 검증된 결과를 한 번에 보내는 `verified-buffered` 방식이다. `cli`(Claude Code)와 `api`(Anthropic)는 기존 사용자를 위한 선택 호환 엔진이다.
+> AI 답변은 `schema/config.yaml`의 LLM 엔진으로 라이브 동작한다. 수업 기본값은 OpenAI API를 부르는 `openai` 엔진이며, API 키가 없으면 AI 답변은 사용할 수 없지만 RULE 경로의 설치·검색 실습은 계속된다. SSE 연결은 citation 검증 전 토큰을 내보내지 않고, 검증된 결과를 한 번에 보내는 `verified-buffered` 방식이다. `cli`(Claude Code)와 `api`(Anthropic)는 기존 사용자를 위한 선택 호환 엔진이다.
 
 ---
 
@@ -389,15 +389,15 @@ C apture  →  O rganize  →  D istill  →  E xpress
 ```yaml
 # schema/config.yaml
 llm:
-  engine: openai  # 수업 기본값: OpenRouter API
-  model: openai/gpt-5.6-luna
-  base_url: https://openrouter.ai/api/v1
-  api_key_env: OPENROUTER_API_KEY
+  engine: openai  # 수업 기본값: OpenAI API
+  model: gpt-4o-mini
+  base_url: https://api.openai.com/v1
+  api_key_env: OPENAI_API_KEY
 ```
 
 | 모드 | 비용 | 조건 |
 |---|---|---|
-| `openai` (수업 기본) | API 과금 | `OPENROUTER_API_KEY` 필요 |
+| `openai` (수업 기본) | API 과금 | `OPENAI_API_KEY` 필요 |
 | `cli` (선택 호환) | 별도 CLI 사용 조건에 따름 | Claude Code 설치 필요 |
 | `api` (선택 호환) | API 과금 | `ANTHROPIC_API_KEY` 필요 |
 

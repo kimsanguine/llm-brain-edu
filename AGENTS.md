@@ -23,7 +23,7 @@
 - 메모 넣기: uv run python scripts/ingest.py --note "내용"
 - 위키 만들기: uv run python scripts/compile.py
 - 화면 확인: uv run python -m wiki_app
-- API 기반 LIVE 컴파일은 OPENROUTER_API_KEY가 설정된 경우에만 사용한다.
+- API 기반 LIVE 컴파일은 OPENAI_API_KEY가 설정된 경우에만 사용한다.
 
 Codex에 파일 작업을 요청할 때는 목표, 대상 파일 또는 폴더, 완료 기준을 함께 적는다. 예: "AGENTS.md를 읽고, raw/notes의 새 메모를 확인한 뒤 근거가 있는 내용만 wiki에 반영해. 변경 파일과 출처를 보고해."
 

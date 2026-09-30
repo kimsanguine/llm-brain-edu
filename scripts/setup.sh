@@ -50,9 +50,9 @@ if [ ! -f schema/config.yaml ]; then
     cat > schema/config.yaml << 'EOF'
 llm:
   engine: openai
-  model: openai/gpt-5.6-luna
-  base_url: https://openrouter.ai/api/v1
-  api_key_env: OPENROUTER_API_KEY
+  model: gpt-4o-mini
+  base_url: https://api.openai.com/v1
+  api_key_env: OPENAI_API_KEY
   max_tokens: 8192
 EOF
 else
@@ -64,7 +64,7 @@ echo "=== 설정 완료 ==="
 echo ""
 echo "다음 단계:"
 echo "  1. schema/sources.yaml 편집 → 소스 경로 등록"
-echo "  2. schema/config.yaml 확인 → OpenRouter API 설정 (선택)"
+echo "  2. schema/config.yaml 확인 → OpenAI API 키 설정 (선택)"
 echo "  3. 첫 ingest 실행:"
 echo "     $PYTHON scripts/ingest.py"
 echo ""

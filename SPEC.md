@@ -7,7 +7,7 @@
 - **GitHub**: github.com/kimsanguine/llm-brain
 - **아키텍처**: `raw/`(원본) → `wiki/`(정제) 2계층 + `express/`(출력) 레이어
 - **컨셉**: LLM을 컴파일러로 사용하는 개인 지식 관리 시스템. Karpathy 원본 패턴 기반, 5축 확장.
-- **수업 에이전트**: Codex가 프로젝트 작업을 돕는 표준 도구다. LLM API 런타임은 OpenRouter의 OpenAI 호환 엔진을 기본으로 하며, Claude Code는 선택 호환 경로다.
+- **수업 에이전트**: Codex가 프로젝트 작업을 돕는 표준 도구다. LLM API 런타임은 OpenAI API(`openai` 엔진)를 기본으로 하며, Claude Code는 선택 호환 경로다.
 
 ---
 
@@ -123,7 +123,7 @@
 
 ### scripts/ingest.py
 
-raw/ 폴더에서 미처리 파일을 탐지하고, URL·파일·노트를 raw/에 저장하며, 처리 상태를 `.ingest_state.json`으로 관리한다. 실제 wiki 컴파일은 schema/config.yaml의 LLM 엔진이 담당하며, 수업 기본값은 OpenRouter의 OpenAI 호환 API다.
+raw/ 폴더에서 미처리 파일을 탐지하고, URL·파일·노트를 raw/에 저장하며, 처리 상태를 `.ingest_state.json`으로 관리한다. 실제 wiki 컴파일은 schema/config.yaml의 LLM 엔진이 담당하며, 수업 기본값은 OpenAI API다.
 
 #### WIKI_ROOT 계산 방식
 
@@ -622,9 +622,9 @@ procedural 기억 로더. `procedures/`의 `.md`(각 `memory_type: procedural`)�
 | 필드 | 값 예시 | 설명 |
 |------|---------|------|
 | `llm.engine` | `openai` \| `cli` \| `api` | LLM 호출 방식 선택. 수업 기본값은 openai |
-| `llm.model` | `openai/gpt-5.6-luna` | OpenRouter에서 사용할 모델 ID (수업 기본값) |
-| `llm.api_key_env` | `OPENROUTER_API_KEY` | OpenAI 호환 API 모드에서 읽을 환경변수명 |
-| `llm.base_url` | `https://openrouter.ai/api/v1` | OpenAI 호환 API의 base URL |
+| `llm.model` | `gpt-4o-mini` | OpenAI API에서 사용할 모델 ID (수업 기본값) |
+| `llm.api_key_env` | `OPENAI_API_KEY` | OpenAI 호환 API 모드에서 읽을 환경변수명 |
+| `llm.base_url` | `https://api.openai.com/v1` | OpenAI 호환 API의 base URL (사내 서버 등으로 교체 가능) |
 | `llm.max_tokens` | `8192` | API 모드 최대 토큰 수 |
 
 ### wiki 페이지 frontmatter 전체 필드
@@ -769,14 +769,14 @@ Label: `ai.habix.llm-wiki`
 
 ## LLM 엔진 통합
 
-**공통 진입점**: `scripts/lib/llm_client.py`의 `call_llm(prompt, *, config, max_tokens)`(비스트림, 텍스트 반환)·`stream_llm(prompt, *, config)`(스트림, 텍스트 청크)이 `schema/config.yaml`의 `llm.engine`으로 openai/cli/api 를 분기한다. 세 엔진의 반환 형식은 동일한 텍스트다. 수업 설정은 openai(OpenRouter)이며, cli(Claude Code)와 api(Anthropic)는 선택 호환이다. `wiki_app/api.py`의 AI 답변 2경로(비스트림·스트림)가 이 진입점을 경유한다.
+**공통 진입점**: `scripts/lib/llm_client.py`의 `call_llm(prompt, *, config, max_tokens)`(비스트림, 텍스트 반환)·`stream_llm(prompt, *, config)`(스트림, 텍스트 청크)이 `schema/config.yaml`의 `llm.engine`으로 openai/cli/api 를 분기한다. 세 엔진의 반환 형식은 동일한 텍스트다. 수업 설정은 openai(OpenAI API)이며, cli(Claude Code)와 api(Anthropic)는 선택 호환이다. `wiki_app/api.py`의 AI 답변 2경로(비스트림·스트림)가 이 진입점을 경유한다.
 
 ### OpenAI 호환 모드 (수업 기본, engine: openai)
 
-`schema/config.yaml`의 `engine: openai` 설정 시 사용한다. OpenRouter 등 OpenAI 호환 서버를 `base_url`로 지정한다.
+`schema/config.yaml`의 `engine: openai` 설정 시 사용한다. 기본은 OpenAI API이며, vLLM·Ollama 같은 OpenAI 호환 서버는 `base_url`로 지정한다.
 
-- 환경변수: `OPENROUTER_API_KEY` (또는 `api_key_env` 지정값)
-- 모델: `openai/gpt-5.6-luna` (수업 기본값)
+- 환경변수: `OPENAI_API_KEY` (또는 `api_key_env` 지정값)
+- 모델: `gpt-4o-mini` (수업 기본값)
 - 키가 없으면 RULE 경로의 설치·검색 실습은 계속되며, LIVE 호출만 명확한 오류로 중단한다.
 
 ### CLI 모드 (선택 호환, engine: cli)

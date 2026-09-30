@@ -142,7 +142,7 @@ def run_checks(root: Path = ROOT, *, fix: bool = False) -> list[dict]:
         # 키가 있는데 없다고 하거나, 없는데 있다고 한다.
         env_name = _configured_key_env(root)
         has_key = bool(os.environ.get(env_name))
-        results.append(_r("openrouter-key", "OK" if has_key else "WARN",
+        results.append(_r("openai-key", "OK" if has_key else "WARN",
                           "" if has_key else
                           f"{env_name} 없음 — 없어도 설치는 완료입니다(RULE 경로로 동작)"))
     if engine == "cli":
@@ -190,19 +190,19 @@ def _raw_engine(root: Path) -> str | None:
 
 
 def _configured_key_env(root: Path) -> str:
-    """config 의 llm.api_key_env. 없으면 OpenRouter 기본값."""
+    """config 의 llm.api_key_env. 없으면 수업 기본값(OPENAI_API_KEY)."""
     cfg = root / "schema" / "config.yaml"
     if not cfg.is_file():
-        return "OPENROUTER_API_KEY"
+        return "OPENAI_API_KEY"
     try:
         import yaml  # noqa: PLC0415
 
         raw = yaml.safe_load(cfg.read_text(encoding="utf-8")) or {}
     except Exception:
-        return "OPENROUTER_API_KEY"
+        return "OPENAI_API_KEY"
     section = raw.get("llm") if isinstance(raw, dict) else None
     name = section.get("api_key_env") if isinstance(section, dict) else None
-    return name.strip() if isinstance(name, str) and name.strip() else "OPENROUTER_API_KEY"
+    return name.strip() if isinstance(name, str) and name.strip() else "OPENAI_API_KEY"
 
 
 def render_guided(root: Path, profile: str | None = None) -> str:

@@ -62,6 +62,17 @@ def test_doctor_treats_uninitialized_personal_data_dirs_as_warnings():
     assert statuses["dir:wiki"] == "WARN"
 
 
+def test_doctor_names_the_openai_api_key_when_it_is_missing(monkeypatch):
+    # 수업 기본 설정에서 키가 없으면 ⚠️ 한 줄이 어느 키인지 이름을 알려 줘야 한다.
+    # 옛 키 이름(OPENROUTER)이 나오면 수강생은 교안과 다른 키를 찾아 헤맨다.
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    results = {r["name"]: r for r in doctor.run_checks(doctor.ROOT)}
+
+    assert results["openai-key"]["status"] == "WARN"
+    assert "OPENAI_API_KEY" in results["openai-key"]["detail"]
+    assert not any("openrouter" in name for name in results)
+
+
 def test_doctor_real_repo_no_fail():
     # 실 repo 는 핵심 체크(디렉토리·스크립트·커맨드·의존성) 통과여야 한다.
     results = doctor.run_checks(doctor.ROOT)

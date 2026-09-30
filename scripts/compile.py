@@ -7,7 +7,7 @@
 
 경로는 둘이고, 어느 쪽으로 돌았는지 항상 화면에 찍는다:
 
-  LIVE — OPENROUTER_API_KEY 가 있고 호출에 성공. LLM 이 요약·분류·연결까지 한다.
+  LIVE — OPENAI_API_KEY 가 있고 호출에 성공. LLM 이 요약·분류·연결까지 한다.
   RULE — 키가 없거나 호출이 실패. 원문을 그대로 옮긴 페이지를 만든다.
          위키는 생기고 화면에도 뜬다. 정리만 안 될 뿐이다.
 
@@ -161,7 +161,7 @@ def _page_by_rule(raw_file: Path, text: str) -> tuple[Path, str]:
         "---\n\n"
         f"# {title}\n\n"
         "> 이 페이지는 **RULE 경로**로 만들어졌습니다. 원문을 그대로 옮겼고 요약·분류·\n"
-        "> 연결은 하지 않았습니다. `OPENROUTER_API_KEY` 를 설정하고 `compile.py --recompile`을 실행하면\n"
+        "> 연결은 하지 않았습니다. `OPENAI_API_KEY` 를 설정하고 `compile.py --recompile`을 실행하면\n"
         "> 같은 메모가 어떻게 정리되는지 비교해 볼 수 있습니다.\n\n"
         f"{body}\n"
     )
@@ -396,7 +396,7 @@ def main() -> int:
         print("  메모를 먼저 넣어 보세요: python scripts/ingest.py --note \"오늘 배운 것\"")
         return 0
 
-    key_env = llm_client.load_llm_config().get("api_key_env", "OPENROUTER_API_KEY")
+    key_env = llm_client.load_llm_config().get("api_key_env", "OPENAI_API_KEY")
     live = bool(os.environ.get(key_env))
     print(f"[compile] 메모 {len(files)}건 → 위키 컴파일")
     print(f"  경로: {'LIVE' if live else 'RULE'} "

@@ -29,11 +29,21 @@ def test_public_readme_marks_codex_as_standard_and_claude_as_compatibility():
     assert "engine: openai" in readme
 
 
-def test_setup_script_keeps_the_course_runtime_on_openrouter():
+def test_course_runtime_uses_the_openai_api_key_everywhere_the_student_looks():
+    # 수업 기본 키는 OpenAI API 키(OPENAI_API_KEY)다(D30).
+    # 설정 파일, setup 스크립트, 수강생 안내 중 하나라도 옛 키 이름을 쓰면
+    # 수강생은 안내대로 키를 넣고도 RULE 경로에 머물고, 이유를 찾지 못한다.
+    config = (ROOT / "schema" / "config.yaml").read_text(encoding="utf-8")
     setup = (ROOT / "scripts" / "setup.sh").read_text(encoding="utf-8")
+    guide = (ROOT / "README_수강생용.md").read_text(encoding="utf-8")
 
-    assert "engine: openai" in setup
-    assert "OPENROUTER_API_KEY" in setup
+    for text in (config, setup):
+        assert "engine: openai" in text
+        assert "api_key_env: OPENAI_API_KEY" in text
+        assert "base_url: https://api.openai.com/v1" in text
+    for text in (config, setup, guide):
+        assert "OPENROUTER" not in text
+    assert "OPENAI_API_KEY" in guide
 
 
 def test_student_opens_codex_only_after_the_folder_exists():
