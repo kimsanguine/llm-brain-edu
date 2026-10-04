@@ -223,10 +223,10 @@ def test_main_force_saves_despite_duplicate(tmp_brain, monkeypatch, capsys):
     captured = _capture_episode(monkeypatch)
     monkeypatch.setattr(sys, "argv", ["ingest.py", "--file", str(src), "--force"])
 
-    with pytest.raises(SystemExit) as exc:  # 미처리 파일 존재 → exit 1 (기존 계약)
+    with pytest.raises(SystemExit) as exc:  # 저장 모드는 저장 성공 → exit 0
         ingest.main()
 
-    assert exc.value.code == 1
+    assert exc.value.code == 0
     dst = tmp_brain / "raw" / "docs" / f"{date_str}-src-agent-memory.md"
     assert dst.exists()  # 저장 강행됨
     assert captured["record"]["task_type"] == "ingest_file"  # episode 기록됨
@@ -242,7 +242,7 @@ def test_main_non_duplicate_saves_normally(tmp_brain, monkeypatch, capsys):
     with pytest.raises(SystemExit) as exc:
         ingest.main()
 
-    assert exc.value.code == 1  # 미처리 파일 존재 (기존 계약)
+    assert exc.value.code == 0  # 저장 성공(미처리가 남아도 저장 모드는 0)
     assert len(list((tmp_brain / "raw" / "notes").glob("*.md"))) == 1
     assert captured["record"]["task_type"] == "ingest_note"
     assert "[중복 차단]" not in capsys.readouterr().out

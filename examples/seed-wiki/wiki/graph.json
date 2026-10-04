@@ -1,0 +1,486 @@
+{
+  "meta": {
+    "generated": "2026-10-04T03:19:49.208793+00:00",
+    "total_pages": 5,
+    "total_nodes": 24,
+    "total_links": 34,
+    "kinds": {
+      "page": 5,
+      "tag": 18,
+      "ghost": 1
+    },
+    "types": {
+      "concept": 3,
+      "tool": 2
+    },
+    "domains": {},
+    "edge_kinds": {
+      "wikilink": 13,
+      "ghost": 1,
+      "tag": 20
+    }
+  },
+  "nodes": [
+    {
+      "id": "llm-wiki-pattern",
+      "kind": "page",
+      "title": "LLM Wiki 패턴",
+      "type": "concept",
+      "category": "concepts",
+      "domain": [],
+      "tags": [
+        "llm-wiki",
+        "karpathy",
+        "knowledge-management"
+      ],
+      "inbound": 4,
+      "outbound": 6
+    },
+    {
+      "id": "distill-progressive",
+      "kind": "page",
+      "title": "Progressive Summarization (점진적 압축)",
+      "type": "concept",
+      "category": "concepts",
+      "domain": [],
+      "tags": [
+        "progressive-summarization",
+        "distill",
+        "second-brain",
+        "llm-automation"
+      ],
+      "inbound": 3,
+      "outbound": 7
+    },
+    {
+      "id": "claude-code",
+      "kind": "page",
+      "title": "Claude Code CLI",
+      "type": "tool",
+      "category": "tools",
+      "domain": [],
+      "tags": [
+        "claude-code",
+        "anthropic",
+        "cli",
+        "agent-system"
+      ],
+      "inbound": 2,
+      "outbound": 6
+    },
+    {
+      "id": "obsidian",
+      "kind": "page",
+      "title": "Obsidian",
+      "type": "tool",
+      "category": "tools",
+      "domain": [],
+      "tags": [
+        "obsidian",
+        "note-taking",
+        "graph-view",
+        "wikilink",
+        "canvas"
+      ],
+      "inbound": 2,
+      "outbound": 9
+    },
+    {
+      "id": "second-brain-code",
+      "kind": "page",
+      "title": "Second Brain & CODE 프레임워크",
+      "type": "concept",
+      "category": "concepts",
+      "domain": [],
+      "tags": [
+        "second-brain",
+        "code-framework",
+        "knowledge-management",
+        "productivity"
+      ],
+      "inbound": 2,
+      "outbound": 6
+    },
+    {
+      "id": "tag:knowledge-management",
+      "kind": "tag",
+      "title": "#knowledge-management",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 2,
+      "outbound": 0
+    },
+    {
+      "id": "tag:second-brain",
+      "kind": "tag",
+      "title": "#second-brain",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 2,
+      "outbound": 0
+    },
+    {
+      "id": "tag:claude-code",
+      "kind": "tag",
+      "title": "#claude-code",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:anthropic",
+      "kind": "tag",
+      "title": "#anthropic",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:cli",
+      "kind": "tag",
+      "title": "#cli",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:agent-system",
+      "kind": "tag",
+      "title": "#agent-system",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:obsidian",
+      "kind": "tag",
+      "title": "#obsidian",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:note-taking",
+      "kind": "tag",
+      "title": "#note-taking",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:graph-view",
+      "kind": "tag",
+      "title": "#graph-view",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:wikilink",
+      "kind": "tag",
+      "title": "#wikilink",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:canvas",
+      "kind": "tag",
+      "title": "#canvas",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:llm-wiki",
+      "kind": "tag",
+      "title": "#llm-wiki",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:karpathy",
+      "kind": "tag",
+      "title": "#karpathy",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:code-framework",
+      "kind": "tag",
+      "title": "#code-framework",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:productivity",
+      "kind": "tag",
+      "title": "#productivity",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:progressive-summarization",
+      "kind": "tag",
+      "title": "#progressive-summarization",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:distill",
+      "kind": "tag",
+      "title": "#distill",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "tag:llm-automation",
+      "kind": "tag",
+      "title": "#llm-automation",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    },
+    {
+      "id": "ghost:페이지명",
+      "kind": "ghost",
+      "title": "페이지명",
+      "type": "ghost",
+      "category": "ghost",
+      "domain": [],
+      "tags": [],
+      "inbound": 1,
+      "outbound": 0
+    }
+  ],
+  "links": [
+    {
+      "source": "claude-code",
+      "target": "obsidian",
+      "kind": "wikilink"
+    },
+    {
+      "source": "claude-code",
+      "target": "llm-wiki-pattern",
+      "kind": "wikilink"
+    },
+    {
+      "source": "obsidian",
+      "target": "distill-progressive",
+      "kind": "wikilink"
+    },
+    {
+      "source": "obsidian",
+      "target": "claude-code",
+      "kind": "wikilink"
+    },
+    {
+      "source": "obsidian",
+      "target": "ghost:페이지명",
+      "kind": "ghost"
+    },
+    {
+      "source": "obsidian",
+      "target": "llm-wiki-pattern",
+      "kind": "wikilink"
+    },
+    {
+      "source": "llm-wiki-pattern",
+      "target": "distill-progressive",
+      "kind": "wikilink"
+    },
+    {
+      "source": "llm-wiki-pattern",
+      "target": "second-brain-code",
+      "kind": "wikilink"
+    },
+    {
+      "source": "llm-wiki-pattern",
+      "target": "claude-code",
+      "kind": "wikilink"
+    },
+    {
+      "source": "second-brain-code",
+      "target": "distill-progressive",
+      "kind": "wikilink"
+    },
+    {
+      "source": "second-brain-code",
+      "target": "llm-wiki-pattern",
+      "kind": "wikilink"
+    },
+    {
+      "source": "distill-progressive",
+      "target": "second-brain-code",
+      "kind": "wikilink"
+    },
+    {
+      "source": "distill-progressive",
+      "target": "obsidian",
+      "kind": "wikilink"
+    },
+    {
+      "source": "distill-progressive",
+      "target": "llm-wiki-pattern",
+      "kind": "wikilink"
+    },
+    {
+      "source": "claude-code",
+      "target": "tag:claude-code",
+      "kind": "tag"
+    },
+    {
+      "source": "claude-code",
+      "target": "tag:anthropic",
+      "kind": "tag"
+    },
+    {
+      "source": "claude-code",
+      "target": "tag:cli",
+      "kind": "tag"
+    },
+    {
+      "source": "claude-code",
+      "target": "tag:agent-system",
+      "kind": "tag"
+    },
+    {
+      "source": "obsidian",
+      "target": "tag:obsidian",
+      "kind": "tag"
+    },
+    {
+      "source": "obsidian",
+      "target": "tag:note-taking",
+      "kind": "tag"
+    },
+    {
+      "source": "obsidian",
+      "target": "tag:graph-view",
+      "kind": "tag"
+    },
+    {
+      "source": "obsidian",
+      "target": "tag:wikilink",
+      "kind": "tag"
+    },
+    {
+      "source": "obsidian",
+      "target": "tag:canvas",
+      "kind": "tag"
+    },
+    {
+      "source": "llm-wiki-pattern",
+      "target": "tag:llm-wiki",
+      "kind": "tag"
+    },
+    {
+      "source": "llm-wiki-pattern",
+      "target": "tag:karpathy",
+      "kind": "tag"
+    },
+    {
+      "source": "llm-wiki-pattern",
+      "target": "tag:knowledge-management",
+      "kind": "tag"
+    },
+    {
+      "source": "second-brain-code",
+      "target": "tag:second-brain",
+      "kind": "tag"
+    },
+    {
+      "source": "second-brain-code",
+      "target": "tag:code-framework",
+      "kind": "tag"
+    },
+    {
+      "source": "second-brain-code",
+      "target": "tag:knowledge-management",
+      "kind": "tag"
+    },
+    {
+      "source": "second-brain-code",
+      "target": "tag:productivity",
+      "kind": "tag"
+    },
+    {
+      "source": "distill-progressive",
+      "target": "tag:progressive-summarization",
+      "kind": "tag"
+    },
+    {
+      "source": "distill-progressive",
+      "target": "tag:distill",
+      "kind": "tag"
+    },
+    {
+      "source": "distill-progressive",
+      "target": "tag:second-brain",
+      "kind": "tag"
+    },
+    {
+      "source": "distill-progressive",
+      "target": "tag:llm-automation",
+      "kind": "tag"
+    }
+  ]
+}

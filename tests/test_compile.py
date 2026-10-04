@@ -371,3 +371,108 @@ def test_corrupt_ingest_state_does_not_crash(sandbox, monkeypatch, bad_state):
     assert compile_mod.main() == 0                             # 죽지 않는다
     assert all(isinstance(x, str) for x in saved["processed"])  # 상태가 문자열 목록으로 남는다
     assert "\\" not in "".join(saved["processed"])              # 경로 구분자는 / 로 통일
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-04 README e2e 회귀 — 예제 위키, raw scope, LIVE 실패 표시
+# ---------------------------------------------------------------------------
+
+
+def test_seed_wiki_ships_with_the_repository():
+    """예제 위키가 저장소에 들어 있다(.gitignore 에 먹히지 않는다).
+
+    깨지면: README "1분 체험"과 수강생 리커버리(`compile.py --seed`)가 fresh clone 에서
+    FileNotFoundError 로 죽는다. 설치가 안 된 학생이 마지막으로 쓰는 안전망이 사라진다.
+    (wiki/·index.md 규칙이 examples/seed-wiki 까지 무시해 한 번도 커밋되지 않았던 사례)
+    """
+    import subprocess
+
+    root = Path(__file__).resolve().parent.parent
+    seed = root / "examples" / "seed-wiki"
+    assert (seed / "index.md").is_file()
+    assert list((seed / "wiki").rglob("*.md"))
+    for rel in ("examples/seed-wiki/index.md", "examples/seed-wiki/wiki/concepts/llm-wiki-pattern.md"):
+        ignored = subprocess.run(["git", "check-ignore", "-q", rel], cwd=root, capture_output=True)
+        assert ignored.returncode == 1, f"{rel} 가 .gitignore 에 걸려 저장소에 올라가지 않는다"
+
+
+def test_seed_missing_explains_instead_of_traceback(sandbox, capsys):
+    """예제 위키가 없으면 traceback 대신 무엇이 없는지 말하고 1로 끝난다.
+
+    깨지면: 비전공 학생이 영어 traceback 을 보고 어디가 잘못됐는지 모른다.
+    """
+    assert compile_mod.do_seed(force=False) == 1
+    assert "예제 위키가 없습니다" in capsys.readouterr().out
+
+
+def _run_main_on(sandbox, monkeypatch, raw_files, live_result=None, key=False):
+    """main() 을 tmp 위에서 돌린다. 저장소의 wiki/graph.json 은 건드리지 않는다."""
+    import types
+
+    import ingest as ingest_mod
+
+    monkeypatch.setattr(sys, "argv", ["compile.py"])
+    monkeypatch.setattr(ingest_mod, "load_state", lambda: {})
+    monkeypatch.setattr(ingest_mod, "save_state", lambda st: None)
+    monkeypatch.setattr(ingest_mod, "find_unprocessed", lambda priority_only=False: list(raw_files))
+    monkeypatch.setattr(compile_mod, "CATEGORIES", ["concepts"])
+    monkeypatch.setitem(sys.modules, "export_graph", types.SimpleNamespace(main=lambda: 0))
+    monkeypatch.setattr(compile_mod.llm_client, "load_llm_config",
+                        lambda *a, **k: {"api_key_env": "OPENAI_API_KEY"})
+    if key:
+        monkeypatch.setenv("OPENAI_API_KEY", "test-not-a-real-key")
+        monkeypatch.setattr(compile_mod, "_page_by_llm", live_result)
+    else:
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    return compile_mod.main()
+
+
+def test_raw_private_scope_reaches_the_wiki_page(sandbox, monkeypatch):
+    """raw 메모에 적은 `scope: private` 가 위키 페이지까지 간다.
+
+    깨지면: okf export 는 위키 페이지의 scope 만 보므로, 학생이 비공개라고 적은 메모가
+    공개 번들(okf/)에 그대로 실린다. README 는 "scope: private 이면 항상 제외"라고 약속한다.
+    """
+    f = sandbox / "raw" / "notes" / "2026-10-04-1000-note.md"
+    f.write_text("---\nscope: private\n---\n\n# 비공개 메모\n\n고객 연락처 정리", encoding="utf-8")
+    assert _run_main_on(sandbox, monkeypatch, [f]) == 0
+    page = next((sandbox / "wiki" / "concepts").glob("*.md")).read_text(encoding="utf-8")
+    assert "\nscope: private\n" in page.split("\n---", 1)[0] + "\n"
+
+
+def test_live_page_keeps_private_scope_even_if_model_drops_it(sandbox, monkeypatch):
+    """LIVE 모델이 frontmatter 에서 scope 를 빠뜨려도 raw 의 private 이 지켜진다."""
+    f = sandbox / "raw" / "notes" / "2026-10-04-1001-note.md"
+    f.write_text("---\nscope: private\n---\n\n# 비공개\n\n내용", encoding="utf-8")
+
+    async def fake_llm(raw_file, text):
+        return sandbox / "wiki" / "concepts" / "secret.md", (
+            "---\ntitle: \"비공개\"\ntype: note\nsources:\n  - raw/notes/x.md\n---\n\n# 비공개\n"
+        )
+
+    assert _run_main_on(sandbox, monkeypatch, [f], live_result=fake_llm, key=True) == 0
+    page = (sandbox / "wiki" / "concepts" / "secret.md").read_text(encoding="utf-8")
+    front = page.split("\n---", 1)[0]
+    assert "scope: private" in front and front.count("scope:") == 1
+
+
+def test_live_failure_is_reported_in_the_summary(sandbox, monkeypatch, capsys):
+    """키가 있는데 LIVE 가 실패하면 요약 줄이 그 사실을 말한다.
+
+    깨지면: 잔액 소진·키 오류 때도 "[compile] 완료"만 보이고 학생은 AI 정리가 된 줄 안다.
+    """
+    f = _raw(sandbox, "2026-10-04-1002-note.md", "메모")
+
+    async def broken_llm(raw_file, text):
+        raise RuntimeError("quota")
+
+    assert _run_main_on(sandbox, monkeypatch, [f], live_result=broken_llm, key=True) == 0
+    out = capsys.readouterr().out
+    assert "LIVE 실패 1건" in out and "RULE로 대체" in out
+
+
+def test_no_live_failure_line_when_no_key(sandbox, monkeypatch, capsys):
+    """키가 없어 RULE 로 도는 정상 경로에는 실패 줄이 나오지 않는다(거짓 경보 방지)."""
+    f = _raw(sandbox, "2026-10-04-1003-note.md", "메모")
+    assert _run_main_on(sandbox, monkeypatch, [f]) == 0
+    assert "LIVE 실패" not in capsys.readouterr().out

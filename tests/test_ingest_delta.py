@@ -260,3 +260,18 @@ def test_main_exits_0_when_raw_empty(tmp_raw, monkeypatch):
         main()
 
     assert exc.value.code == 0
+
+
+def test_note_save_exits_0_even_with_pending(tmp_raw, monkeypatch, capsys):
+    """메모를 저장한 실행은 미처리 파일이 남아도 0으로 끝나고 다음 단계를 알려 준다.
+
+    깨지면: 수강생 흐름에서 Codex·스크립트가 정상 저장(exit 1)을 실패로 읽고 멈춘다.
+    목록 모드의 exit 1 계약(test_main_exits_1_when_unprocessed_present)은 그대로다.
+    """
+    monkeypatch.setattr(sys, "argv", ["ingest.py", "--note", "오늘 배운 것"])
+
+    with pytest.raises(SystemExit) as exc:
+        main()
+
+    assert exc.value.code == 0
+    assert "compile.py" in capsys.readouterr().out

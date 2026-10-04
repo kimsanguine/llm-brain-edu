@@ -48,3 +48,7 @@ episodes/
 
 # wiki 목차 — gitignored wiki/의 파생물. business/ 민감 제목 노출 방지로 추적 제외(2026-06-28)
 index.md
+
+# 예제 위키는 저장소에 포함한다(위의 wiki/, index.md 규칙이 이 폴더까지 무시하지 않게)
+!examples/seed-wiki/index.md
+!examples/seed-wiki/wiki/

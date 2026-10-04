@@ -412,7 +412,12 @@ def main() -> None:
         resonance_tag = f" [{resonance}]" if resonance else ""
         print(f"  - {f.relative_to(WIKI_ROOT)}{resonance_tag}")
 
-    # exit code 1 = 처리할 파일 있음 (run_daily.sh가 이를 감지해 LLM 호출)
+    # 저장 모드(--url/--file/--note)는 저장 성공이 결과이므로 0으로 끝낸다. 1로 끝내면
+    # Codex·스크립트가 정상 저장을 실패로 읽는다. 목록 모드(인자 없음)만 기존 계약대로
+    # exit 1 = 처리할 파일 있음 (자동화가 이를 감지해 컴파일을 돌린다).
+    if args.url or args.file or args.note:
+        print("  다음 단계: uv run python scripts/compile.py")
+        sys.exit(0)
     sys.exit(1)
 
 

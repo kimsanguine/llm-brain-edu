@@ -128,6 +128,37 @@ def _raw_tags(text: str) -> list[str]:
     return out
 
 
+def _raw_scope(text: str) -> str | None:
+    """원문 frontmatter 의 scope(private|shared)를 읽는다.
+
+    okf export 는 wiki 페이지의 scope 만 본다. raw 에 `scope: private` 를 적어도
+    compile 이 옮기지 않으면 그 메모가 공개 번들에 그대로 실린다.
+    """
+    head = text.lstrip("﻿").lstrip()
+    m = re.match(r"^---\s*\n(.*?)\n---", head, flags=re.S)
+    if not m:
+        return None
+    try:
+        meta = yaml.safe_load(m.group(1)) or {}
+    except yaml.YAMLError:
+        return None
+    scope = meta.get("scope") if isinstance(meta, dict) else None
+    if isinstance(scope, str) and scope.strip().lower() in ("private", "shared"):
+        return scope.strip().lower()
+    return None
+
+
+def _with_scope(page: str, scope: str | None) -> str:
+    """페이지 frontmatter 의 scope 를 raw 값으로 맞춘다(LIVE 모델이 빠뜨려도 지킨다)."""
+    if not scope or not page.startswith("---"):
+        return page
+    end = page.find("\n---", 3)
+    if end == -1:
+        return page
+    head = re.sub(r"(?m)^scope:.*\n?", "", page[:end + 1])
+    return head + f"scope: {scope}\n" + page[end + 1:]
+
+
 def _page_by_rule(raw_file: Path, text: str) -> tuple[Path, str]:
     """원문을 그대로 옮긴 위키 페이지를 만든다(요약·분류 없음)."""
     body = _strip_frontmatter(text).strip()
@@ -298,6 +329,10 @@ def do_seed(force: bool) -> int:
         print(f"  위키에 이미 {len(existing)}개 페이지가 있어 덮어쓰지 않았습니다.")
         print("  정말 예제로 되돌리려면: python scripts/compile.py --seed --force")
         return 1
+    if not (SEED_DIR / "index.md").is_file() or not (SEED_DIR / "wiki").is_dir():
+        print(f"  예제 위키가 없습니다: {SEED_DIR.relative_to(ROOT)}")
+        print("  저장소를 다시 내려받거나(git pull), 이 화면을 복사해 질문 채널에 올려 주세요.")
+        return 1
     shutil.copy(SEED_DIR / "index.md", INDEX_FILE)
     WIKI_DIR.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SEED_DIR / "wiki", WIKI_DIR, dirs_exist_ok=True)
@@ -408,6 +443,7 @@ def main() -> int:
         return 0
 
     written = 0
+    live_failed = 0              # 키가 있는데 LIVE 가 안 된 건수(요약 줄에서 숨기지 않는다)
     compiled_records: dict = {}
     ok_files: list = []          # 실제로 페이지가 만들어진 raw 만 완료 처리한다
     for f in files:
@@ -423,14 +459,17 @@ def main() -> int:
                 result = asyncio.run(_page_by_llm(f, text))
                 how = "LIVE" if result else "RULE"
                 if result is None:
+                    live_failed += 1
                     print(f"   ! {f.name}: 응답 형식이 어긋나 RULE 로 넘어갑니다")
             except Exception as exc:  # 한도 초과·네트워크 등 — 삼키지 않고 이유를 보여준다
+                live_failed += 1
                 print(f"   ! {f.name}: 호출 실패({type(exc).__name__}) — RULE 로 넘어갑니다")
                 print(f"     {exc}")
         if result is None:
             result = _page_by_rule(f, text)
 
         out_path, page = result
+        page = _with_scope(page, _raw_scope(text))
         out_path = _previous_target(f) or _safe_target(out_path, f)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(page, encoding="utf-8")
@@ -466,6 +505,9 @@ def main() -> int:
     print(f"[compile] 완료 — {written}개 페이지를 만들었습니다.")
     if failed:
         print(f"  {failed}건은 내용을 읽지 못해 넘겼습니다. 고친 뒤 다시 실행하면 그때 처리됩니다.")
+    if live_failed:
+        print(f"  ⚠️ LIVE 실패 {live_failed}건, RULE로 대체했습니다(AI 정리 없이 원문을 옮김).")
+        print("     키·잔액·네트워크를 확인한 뒤 `uv run python scripts/compile.py --recompile` 로 다시 정리하세요.")
     print("  화면으로 보기: python -m wiki_app  →  http://localhost:8000")
     return 0
 

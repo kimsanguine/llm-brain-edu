@@ -47,7 +47,7 @@ def test_ingest_note_records_pending_episode(tmp_raw, monkeypatch):
     captured = _capture_append(monkeypatch)
     monkeypatch.setattr(sys, "argv", ["ingest.py", "--note", "RAG 메모", "--resonance", "high"])
 
-    with pytest.raises(SystemExit):  # 미처리 노트 존재 → 종료 코드 1
+    with pytest.raises(SystemExit):  # 저장 모드 → 종료 코드 0
         ingest.main()
 
     rec = captured["record"]
@@ -91,7 +91,7 @@ def test_ingest_note_fail_soft_when_append_raises(tmp_raw, monkeypatch):
     # RuntimeError 가 아니라 SystemExit(정상 종료 경로)가 떠야 fail-soft 성립.
     with pytest.raises(SystemExit) as exc:
         ingest.main()
-    assert exc.value.code == 1  # 미처리 노트 존재
+    assert exc.value.code == 0  # 저장 성공(원장 실패는 결과를 바꾸지 않음)
 
     # 노트는 여전히 저장돼 있어야 한다.
     notes = list((tmp_raw / "raw" / "notes").glob("*.md"))

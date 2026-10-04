@@ -34,7 +34,7 @@ uv run python scripts/ingest.py --note "<텍스트>" [--resonance <level>]
 uv run python scripts/ingest.py [--priority-only]
 ```
 
-exit code 0 = 처리할 파일 없음, exit code 1 = 미처리 파일 있음.
+목록 모드: exit code 0 = 처리할 파일 없음, exit code 1 = 미처리 파일 있음. 저장 모드(`--url`·`--file`·`--note`)는 저장 성공 시 0.
 
 ## Step 2: wiki 컴파일
 

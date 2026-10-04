@@ -134,17 +134,24 @@ uv run python -m wiki_app                        # 로컬 HTML UI → http://loc
 
 ### 2) 내 메모로 운영하기
 
-핵심 흐름은 **넣기 → 물어보기 → 꺼내쓰기** 3단계다.
+핵심 흐름은 **넣기 → 위키 만들기 → 화면으로 보기** 3단계다. 모두 **터미널** 명령이고, Codex·Claude Code 없이도 된다.
 
-**먼저, 내 메모가 어디 있는지 알려준다.** `schema/sources.yaml`(소스 등록 설정 파일)을 열어 내 메모 폴더 경로를 적는다. 파일 편집이 막막하면 **Claude Code 입력창에 자연어로** "내 옵시디언 폴더를 `schema/sources.yaml`에 등록해줘"라고 부탁해도 된다. (`raw/` = 아직 정리 안 된 원본 메모가 모이는 폴더.)
+▶ **터미널**에 입력:
 
-그다음 ▶ **Claude Code 입력창**에 입력:
-
+```bash
+uv run python scripts/ingest.py --note "오늘 배운 것: ..."      # ① 넣기: 메모를 raw/에 저장
+uv run python scripts/ingest.py --file ~/Downloads/paper.pdf  #    파일(PDF·DOCX·PPTX·MD·TXT)도 같다
+uv run python scripts/compile.py                               # ② 위키 만들기: raw/ → wiki/
+uv run python -m wiki_app                                      # ③ 화면으로 보기: 검색·페이지뷰
 ```
-/llm-brain:ingest               # ① 넣기: raw → wiki 자동 정리
-/llm-brain:query "..."          # ② 물어보기: wiki 기반 답변
-/llm-brain:express blog "..."   # ③ 꺼내쓰기: 글 초안 생성
-```
+
+- `raw/` = 아직 정리 안 된 원본 메모가 모이는 폴더, `wiki/` = 정리된 결과다.
+- `compile.py`는 `OPENAI_API_KEY`가 있으면 AI가 요약·분류(LIVE), 없으면 원문을 그대로 페이지로 옮긴다(RULE). 키가 없어도 위키와 검색은 동작한다.
+- 웹 화면 주소는 보통 `http://localhost:8000`이고, 8000이 사용 중이면 터미널에 찍힌 다른 주소(예: 8001)를 쓴다.
+
+**내 메모 폴더를 통째로 가져오려면** `schema/sources.example.yaml`을 `schema/sources.yaml`로 복사해 폴더 경로를 적고, `uv run python scripts/sync_raw.py`로 `raw/`에 미러링한 뒤 ②부터 실행한다.
+
+> Claude Code 플러그인 사용자는 같은 흐름을 `/llm-brain:ingest`·`/llm-brain:query "..."`·`/llm-brain:express blog "..."`로도 실행할 수 있다(선택 호환).
 
 ---
 

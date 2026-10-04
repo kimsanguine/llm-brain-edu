@@ -221,7 +221,10 @@ def render_guided(root: Path, profile: str | None = None) -> str:
             f"{root / 'examples' / 'seed-wiki' / 'wiki'}: "
             f"cd {shlex.quote(str(root))} && uv run python -c \"from pathlib import Path; "
             "from wiki_app.api import create_app; "
-            "create_app(wiki_root=Path('examples/seed-wiki/wiki')); "
+            "seed=Path('examples/seed-wiki'); "
+            "assert (seed/'index.md').is_file() and any((seed/'wiki').rglob('*.md')), "
+            "'seed wiki missing: examples/seed-wiki'; "
+            "create_app(wiki_root=seed/'wiki'); "
             "print('Demo installation verification OK')\""
         )
         label = "Demo"
