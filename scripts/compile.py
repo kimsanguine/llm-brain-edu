@@ -338,7 +338,7 @@ def do_seed(force: bool) -> int:
     shutil.copytree(SEED_DIR / "wiki", WIKI_DIR, dirs_exist_ok=True)
     n = len(list(WIKI_DIR.rglob("*.md")))
     print(f"  예제 위키 {n}개 페이지를 넣었습니다.")
-    print("  이제 `python -m wiki_app` 을 실행하고 http://localhost:8000 을 여세요.")
+    print("  이제 `uv run python -m wiki_app` 을 실행하고 터미널에 찍힌 주소(보통 http://localhost:8000)를 여세요.")
     print("  (내 메모로 만든 위키를 보려면 나중에 --seed 없이 다시 실행하세요.)")
     return 0
 
@@ -428,7 +428,7 @@ def main() -> int:
              if args.recompile else ingest.find_unprocessed())
     if not files:
         print("[compile] 새로 정리할 메모가 없습니다.")
-        print("  메모를 먼저 넣어 보세요: python scripts/ingest.py --note \"오늘 배운 것\"")
+        print("  메모를 먼저 넣어 보세요: uv run python scripts/ingest.py --note \"오늘 배운 것\"")
         return 0
 
     key_env = llm_client.load_llm_config().get("api_key_env", "OPENAI_API_KEY")
@@ -508,7 +508,7 @@ def main() -> int:
     if live_failed:
         print(f"  ⚠️ LIVE 실패 {live_failed}건, RULE로 대체했습니다(AI 정리 없이 원문을 옮김).")
         print("     키·잔액·네트워크를 확인한 뒤 `uv run python scripts/compile.py --recompile` 로 다시 정리하세요.")
-    print("  화면으로 보기: python -m wiki_app  →  http://localhost:8000")
+    print("  화면으로 보기: uv run python -m wiki_app  →  터미널에 찍힌 주소(보통 http://localhost:8000)")
     return 0
 
 

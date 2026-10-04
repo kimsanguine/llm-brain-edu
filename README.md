@@ -140,16 +140,17 @@ uv run python -m wiki_app                        # 로컬 HTML UI → http://loc
 
 ```bash
 uv run python scripts/ingest.py --note "오늘 배운 것: ..."      # ① 넣기: 메모를 raw/에 저장
-uv run python scripts/ingest.py --file ~/Downloads/paper.pdf  #    파일(PDF·DOCX·PPTX·MD·TXT)도 같다
+cp ~/Downloads/paper.pdf raw/docs/                             #    파일(PDF·DOCX·PPTX·MD·TXT)은 raw/docs/에 복사
 uv run python scripts/compile.py                               # ② 위키 만들기: raw/ → wiki/
 uv run python -m wiki_app                                      # ③ 화면으로 보기: 검색·페이지뷰
 ```
 
 - `raw/` = 아직 정리 안 된 원본 메모가 모이는 폴더, `wiki/` = 정리된 결과다.
+- 바로 위 1분 체험을 했다면 먼저 예제를 치운다: `rm -rf wiki index.md`. 예제 페이지는 `raw/` 출처가 없어서, 내 페이지와 섞이면 AI 답변용 근거 정리(`claims.py build`)가 실패한다.
 - `compile.py`는 `OPENAI_API_KEY`가 있으면 AI가 요약·분류(LIVE), 없으면 원문을 그대로 페이지로 옮긴다(RULE). 키가 없어도 위키와 검색은 동작한다.
 - 웹 화면 주소는 보통 `http://localhost:8000`이고, 8000이 사용 중이면 터미널에 찍힌 다른 주소(예: 8001)를 쓴다.
 
-**내 메모 폴더를 통째로 가져오려면** `schema/sources.example.yaml`을 `schema/sources.yaml`로 복사해 폴더 경로를 적고, `uv run python scripts/sync_raw.py`로 `raw/`에 미러링한 뒤 ②부터 실행한다.
+**내 메모 폴더를 통째로 가져오려면** `schema/sources.example.yaml`을 `schema/sources.yaml`로 복사해 폴더 경로를 적고, 그 항목의 `disabled: true` 줄을 지운다(남아 있으면 아무것도 복사하지 않는다). 그다음 `uv run python scripts/sync_raw.py`로 `raw/`에 미러링하고 ②부터 실행한다.
 
 > Claude Code 플러그인 사용자는 같은 흐름을 `/llm-brain:ingest`·`/llm-brain:query "..."`·`/llm-brain:express blog "..."`로도 실행할 수 있다(선택 호환).
 
