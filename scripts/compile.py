@@ -82,9 +82,34 @@ def _yaml_str(s: str) -> str:
 
 def _slugify(title: str) -> str:
     """제목을 파일명으로. 한글은 그대로 두고 공백·기호만 정리한다."""
-    s = re.sub(r"[\s/\\:*?\"<>|]+", "-", title.strip())
+    # 점도 바꾼다. claim ID(claim:{slug}-N)는 점을 허용하지 않아, 점이 남으면
+    # claims.py build 가 그 페이지에서 멈추고 AI 답변을 쓸 수 없다.
+    s = re.sub(r"[\s/\\:*?\"<>|.]+", "-", title.strip())
     s = re.sub(r"-{2,}", "-", s).strip("-").lower()
     return s[:60] or "untitled"
+
+
+# ingest.py --file 은 PDF·DOCX·PPTX 원본 옆에 텍스트를 뽑은 `<원본 이름>.extracted.md`
+# 사이드카를 함께 저장한다(상류에서는 Claude 가 이 사이드카를 읽는다). compile 은 둘을
+# 각각 페이지로 만들면 안 된다 — 같은 내용이 두 번 검색되고, 추출본 쪽 slug 의 점 때문에
+# claims.py build 가 실패한다. 사이드카가 있는 원본은 건너뛰고 사이드카로 한 페이지만 만든다.
+SIDECAR_SUFFIX = ".extracted.md"
+
+
+def _sidecar_of(raw_file: Path) -> Path:
+    return raw_file.with_name(raw_file.stem + SIDECAR_SUFFIX)
+
+
+def _has_sidecar(raw_file: Path) -> bool:
+    """텍스트가 아닌 원본이고, 그 사이드카가 실제로 있으면 True."""
+    return raw_file.suffix.lower() not in (".md", ".txt") and _sidecar_of(raw_file).is_file()
+
+
+def _slug_stem(raw_file: Path) -> str:
+    """페이지 이름의 바탕. 사이드카는 `.extracted` 를 떼어 원본 이름을 쓴다."""
+    if raw_file.name.endswith(SIDECAR_SUFFIX):
+        return raw_file.name[: -len(SIDECAR_SUFFIX)]
+    return raw_file.stem
 
 
 def _strip_frontmatter(text: str) -> str:
@@ -166,7 +191,7 @@ def _page_by_rule(raw_file: Path, text: str) -> tuple[Path, str]:
     # slug 는 제목이 아니라 raw 파일명에서 만든다. CLAUDE.md 규약이 "한국어 개념도 영문
     # slug" 이고, 한글 파일명은 macOS 에서 NFD 로 저장돼 도구마다 다르게 보인다.
     # 화면에 뜨는 건 frontmatter 의 title 이므로 학생에게는 한국어 제목이 보인다.
-    slug = _slugify(raw_file.stem)
+    slug = _slugify(_slug_stem(raw_file))
     today = date.today().isoformat()
     rel_raw = raw_file.relative_to(ROOT).as_posix()
     tags = _raw_tags(text)
@@ -426,7 +451,9 @@ def main() -> int:
     files = (sorted(f for f in ingest.RAW_DIR.rglob("*")
                     if f.is_file() and f.suffix.lower() in ingest.SUPPORTED_EXTENSIONS)
              if args.recompile else ingest.find_unprocessed())
-    if not files:
+    twins = [f for f in files if _has_sidecar(f)]      # 사이드카로 정리되는 원본
+    files = [f for f in files if not _has_sidecar(f)]
+    if not files and not twins:
         print("[compile] 새로 정리할 메모가 없습니다.")
         print("  메모를 먼저 넣어 보세요: uv run python scripts/ingest.py --note \"오늘 배운 것\"")
         return 0
@@ -446,6 +473,14 @@ def main() -> int:
     live_failed = 0              # 키가 있는데 LIVE 가 안 된 건수(요약 줄에서 숨기지 않는다)
     compiled_records: dict = {}
     ok_files: list = []          # 실제로 페이지가 만들어진 raw 만 완료 처리한다
+    for orig in twins:
+        # 사이드카로 정리했으므로 원본은 페이지를 만들지 않고 완료로만 기록한다.
+        # 예전 판에서 원본으로 따로 만든 중복 페이지가 있으면 함께 정리한다.
+        dup = _previous_target(orig)
+        if dup is not None:
+            dup.unlink()
+            print(f"   - {dup.relative_to(ROOT)}: 추출본 페이지와 중복이라 지웠습니다")
+        compiled_records[orig.relative_to(ROOT).as_posix()] = {"sha256": ingest.file_digest(orig)}
     for f in files:
         digest = ingest.file_digest(f)
         text = ingest.extract_text(f)
@@ -470,9 +505,16 @@ def main() -> int:
 
         out_path, page = result
         page = _with_scope(page, _raw_scope(text))
-        out_path = _previous_target(f) or _safe_target(out_path, f)
+        prev, stale = _previous_target(f), None
+        if prev is not None and "." in prev.stem:
+            # 점이 든 옛 이름(예: …paper.extracted)은 claims 가 읽지 못한다. 새 이름으로 옮긴다.
+            prev, stale = None, prev
+        out_path = prev or _safe_target(out_path, f)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(page, encoding="utf-8")
+        if stale is not None and stale != out_path:
+            stale.unlink()
+            print(f"     옛 이름 {stale.relative_to(ROOT)} 는 지웠습니다(같은 출처, 새 이름으로 옮김)")
         written += 1
         ok_files.append(f)
         compiled_records[f.relative_to(ROOT).as_posix()] = {"sha256": digest}
@@ -495,7 +537,7 @@ def main() -> int:
     done = set()
     if isinstance(prev, list):
         done = {p.replace("\\", "/") for p in prev if isinstance(p, str)}
-    done.update(f.relative_to(ROOT).as_posix() for f in ok_files)
+    done.update(f.relative_to(ROOT).as_posix() for f in ok_files + twins)
     state["processed"] = sorted(done)
     previous_records = state.get("compiled")
     state["compiled"] = {**(previous_records if isinstance(previous_records, dict) else {}), **compiled_records}

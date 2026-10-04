@@ -476,3 +476,109 @@ def test_no_live_failure_line_when_no_key(sandbox, monkeypatch, capsys):
     f = _raw(sandbox, "2026-10-04-1003-note.md", "메모")
     assert _run_main_on(sandbox, monkeypatch, [f]) == 0
     assert "LIVE 실패" not in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# PDF 사이드카 — 원본 1개는 위키 페이지 1개 (2026-10-04)
+# ---------------------------------------------------------------------------
+
+
+def _ingest_pdf_like(sandbox: Path, stem: str = "2026-10-04-pricing-report") -> tuple[Path, Path]:
+    """ingest.py --file 이 PDF 에 대해 만드는 것과 같은 모양: 원본 + .extracted.md 사이드카."""
+    docs = sandbox / "raw" / "docs"
+    docs.mkdir(parents=True, exist_ok=True)
+    pdf = docs / f"{stem}.pdf"
+    import pymupdf  # 진짜 PDF 여야 수정 전 코드가 "페이지 2개"로 실패한다(가짜 바이트는 추출에서 먼저 죽음)
+
+    doc = pymupdf.open()
+    doc.new_page().insert_text((72, 72), "Quarterly pricing report. Churn fell 3 percent.")
+    doc.save(pdf)
+    side = docs / f"{stem}.extracted.md"
+    side.write_text(f"---\ntitle: {stem}.pdf 추출본\nsource_file: {stem}.pdf\n---\n\n"
+                    "Quarterly pricing report. Churn fell 3 percent.", encoding="utf-8")
+    return pdf, side
+
+
+def _run_compile(sandbox, monkeypatch, argv, pending=None):
+    """main() 을 tmp 위에서. 상태 파일 저장 결과를 돌려준다."""
+    import types
+
+    import ingest as ingest_mod
+
+    saved: dict = {}
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(ingest_mod, "RAW_DIR", sandbox / "raw")
+    monkeypatch.setattr(ingest_mod, "load_state", lambda: {})
+    monkeypatch.setattr(ingest_mod, "save_state", lambda st: saved.update(st))
+    if pending is not None:
+        monkeypatch.setattr(ingest_mod, "find_unprocessed", lambda priority_only=False: list(pending))
+    monkeypatch.setattr(compile_mod, "CATEGORIES", ["concepts"])
+    monkeypatch.setitem(sys.modules, "export_graph", types.SimpleNamespace(main=lambda: 0))
+    monkeypatch.setattr(compile_mod.llm_client, "load_llm_config",
+                        lambda *a, **k: {"api_key_env": "OPENAI_API_KEY"})
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert compile_mod.main() == 0
+    return saved
+
+
+def test_pdf_with_sidecar_becomes_one_page(sandbox, monkeypatch):
+    """PDF 하나를 넣으면 위키 페이지도 하나다.
+
+    깨지면: 같은 내용이 검색에 두 번 나오고, 추출본 페이지 이름의 점 때문에
+    claims.py build 가 실패해 웹 AI 답변을 쓸 수 없다(README 의 파일 넣기 경로).
+    """
+    pdf, side = _ingest_pdf_like(sandbox)
+    saved = _run_compile(sandbox, monkeypatch, ["compile.py"], pending=[side, pdf])
+    pages = sorted((sandbox / "wiki" / "concepts").glob("*.md"))
+    assert [p.name for p in pages] == ["2026-10-04-pricing-report.md"]
+    assert compile_mod._page_sources(pages[0]) == ["raw/docs/2026-10-04-pricing-report.extracted.md"]
+    # 원본도 완료로 기록해야 다음 ingest 가 계속 "미처리 1개"라고 하지 않는다
+    assert {"raw/docs/2026-10-04-pricing-report.pdf",
+            "raw/docs/2026-10-04-pricing-report.extracted.md"} <= set(saved["processed"])
+
+
+def test_page_slugs_are_valid_claim_ids(sandbox):
+    """파일 이름에 점이 있어도 페이지 이름은 claim ID 규칙을 지킨다.
+
+    깨지면: `v1.2 회의록.md` 같은 메모 하나 때문에 claims.py build 전체가 멈춘다.
+    """
+    from lib.claim_ledger import _CLAIM_ID_RE
+
+    for stem in ("2026-10-04-v1.2-notes", "2026-10-04-pricing-report.extracted"):
+        f = sandbox / "raw" / "notes" / f"{stem}.md"
+        f.write_text("본문", encoding="utf-8")
+        path, _ = compile_mod._page_by_rule(f, f.read_text(encoding="utf-8"))
+        assert _CLAIM_ID_RE.match(f"claim:{path.stem}-1"), path.stem
+
+
+def test_recompile_cleans_up_old_double_pages(sandbox, monkeypatch):
+    """예전 판이 만든 중복 페이지 두 개는 --recompile 한 번으로 하나가 된다.
+
+    깨지면: 이미 PDF 를 넣은 학생은 고친 판을 받아도 중복과 claims 실패가 그대로 남는다.
+    """
+    pdf, side = _ingest_pdf_like(sandbox)
+    concepts = sandbox / "wiki" / "concepts"
+    concepts.mkdir(parents=True)
+    (concepts / "2026-10-04-pricing-report.md").write_text(
+        "---\ntitle: 원본\nsources:\n  - raw/docs/2026-10-04-pricing-report.pdf\n---\n\n본문", encoding="utf-8")
+    (concepts / "2026-10-04-pricing-report.extracted.md").write_text(
+        "---\ntitle: 추출본\nsources:\n  - raw/docs/2026-10-04-pricing-report.extracted.md\n---\n\n본문",
+        encoding="utf-8")
+
+    _run_compile(sandbox, monkeypatch, ["compile.py", "--recompile"])
+    pages = sorted(concepts.glob("*.md"))
+    assert [p.name for p in pages] == ["2026-10-04-pricing-report.md"]
+    assert compile_mod._page_sources(pages[0]) == ["raw/docs/2026-10-04-pricing-report.extracted.md"]
+
+
+def test_plain_pdf_without_sidecar_still_compiles(sandbox, monkeypatch):
+    """사이드카 없이 `cp` 로 넣은 PDF 는 지금처럼 원본으로 한 페이지가 된다."""
+    import ingest as ingest_mod
+
+    docs = sandbox / "raw" / "docs"
+    docs.mkdir(parents=True)
+    pdf = docs / "2026-10-04-report.pdf"
+    pdf.write_bytes(b"%PDF")
+    monkeypatch.setattr(ingest_mod, "extract_text", lambda f: "Report body text.")
+    _run_compile(sandbox, monkeypatch, ["compile.py"], pending=[pdf])
+    assert [p.name for p in (sandbox / "wiki" / "concepts").glob("*.md")] == ["2026-10-04-report.md"]
