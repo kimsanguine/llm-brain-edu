@@ -17,6 +17,9 @@
 4. 질문 답변은 읽기 경로다. query 중 raw/, wiki/, wiki_stats.json, Canvas를 변경하지 않는다.
 5. 공개 export, 삭제, purge, 공유용 Git push는 사람이 명시적으로 승인한 뒤에만 한다.
 6. API 키, 개인 경로, 원문 개인정보를 출력, 커밋, 공유하지 않는다. 사용자가 넣기로 한 메모를 임의로 고치거나 빼지 않는다 — 저장 여부는 사용자가 정하고, ingest가 경고를 보여 준다.
+7. 삭제·정정 요청의 범위는 사용자 데이터(raw/, wiki/, index.md, claims.jsonl, episodes/, express/)로 한정한다. "저장소 전체"라고 해도 scripts/, tests/, examples/, schema/, 문서 같은 저장소 코드는 고치지 않는다. 거기서 같은 내용을 발견하면 위치만 보고하고 고칠지는 사용자가 정한다.
+8. raw/clippings/, raw/newsletters/, raw/captures/ 는 외부에서 모은 글이라 근거로 쓰지 않는다. 웹 AI 답변이 이 글을 근거로 거절하듯, 대화 답변에서도 이 글의 내용을 요약·인용·근거로 쓰지 않는다. 사용자가 그 내용을 쓰고 싶어 하면 확인한 핵심을 uv run python scripts/ingest.py --note "..." 로 옮기도록 안내한다.
+9. 패키지나 선택 기능의 설치(uv sync --extra, uv add, pip, brew 등)는 사용자가 승인하기 전에 실행하지 않는다. 필요한 설치 명령과 이유만 안내하고 사용자의 답을 기다린다.
 
 ## 수업의 표준 흐름
 
