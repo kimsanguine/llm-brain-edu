@@ -386,8 +386,9 @@ AI 서비스로 전송됩니다.** 요약과 분류를 AI 가 하기 때문입�
    해당 메모가 남은 `user_goal`과 `inputs.source`의 문자열 값을 `[삭제됨]`으로 바꿉니다.
    줄 전체나 따옴표 구조를 손상시키지 마세요. 일반 실행은 원장을 수정하지 않으며,
    이 단계는 본인이 승인한 개인정보 정정 작업입니다.
-4. `uv run python scripts/compile.py --recompile`으로 위키와 `index.md`, `wiki/graph.json`을
-   갱신합니다. 키가 없는 RULE 경로인지 출력에서 확인하세요. 과거에 생긴 중복 페이지,
+4. `uv run python scripts/compile.py --recompile --rule`으로 위키와 `index.md`, `wiki/graph.json`을
+   갱신합니다(`--rule`은 키나 `engine: cli`가 있어도 메모를 외부 AI로 보내지 않습니다). 이어서
+   `uv run python scripts/claims.py build`로 근거 원장(`claims.jsonl`)도 다시 만듭니다. 과거에 생긴 중복 페이지,
    직접 만든 요약, `express/`와 공유용 `okf/`, 백업에도 같은 값이 남았는지 확인합니다.
 5. 이미 외부 AI에 전송했거나 파일을 공유했다면 로컬 수정으로 그 사본까지 회수되지는
    않습니다. 해당 서비스의 기록 관리와 공유본 정리를 별도로 진행하세요.

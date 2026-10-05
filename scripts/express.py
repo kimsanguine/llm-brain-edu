@@ -373,7 +373,7 @@ sources:
     _print_synthesis_hint("report", topic, out_path, pages)
 
 
-PLACEHOLDER_MARKERS = ("합성 대기 중", "<!-- CONTEXT_START -->")
+PLACEHOLDER_MARKERS = ("합성 대기 중", "<!-- CONTEXT_START -->", "— Claude가 작성)")
 
 
 def cmd_publish(draft: str) -> int:

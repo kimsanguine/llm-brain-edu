@@ -170,3 +170,39 @@ def test_compile_main_goes_live_with_cli_engine_and_no_key(tmp_path, monkeypatch
     out = capsys.readouterr().out
     assert called.get("yes"), "cli 엔진인데 모델을 부르지 않고 RULE 로 돌았다"
     assert "경로: LIVE" in out and "[LIVE]" in out
+
+
+def test_dry_run_shows_engine_even_with_nothing_to_compile(tmp_path, monkeypatch, capsys):
+    """정리할 메모가 없어도 compile 은 어떤 경로(LIVE/RULE)로 돌지 알려 준다.
+
+    깨지면: README 의 "dry-run 이 `engine cli — claude CLI 감지됨`을 찍으면 준비 완료"를
+    이미 다 컴파일한 사용자는 확인할 수 없다(2차 e2e N1).
+    """
+    import ingest as ingest_mod
+
+    monkeypatch.setattr(sys, "argv", ["compile.py", "--dry-run"])
+    monkeypatch.setattr(ingest_mod, "find_unprocessed", lambda priority_only=False: [])
+    monkeypatch.setattr(compile_mod.llm_client, "load_llm_config", lambda *a, **k: {"engine": "cli"})
+    monkeypatch.setattr(compile_mod.shutil, "which", lambda name: "/usr/local/bin/claude")
+    assert compile_mod.main() == 0
+    assert "engine cli — claude CLI 감지됨" in capsys.readouterr().out
+
+
+def test_publish_refuses_draft_with_only_title_placeholder(blog_env):
+    """제목 자리표시만 남은 초안도 빈 틀로 보고 거부한다."""
+    express.cmd_blog("RAG 평가")
+    draft = next((blog_env / "express" / "blog").glob("*.md"))
+    draft.write_text("---\ntype: blog\n---\n\n# (블로그 제목 — Claude가 작성)\n", encoding="utf-8")
+    assert express.cmd_publish(str(draft)) == 1
+
+
+def test_claims_ledger_is_not_committed_by_accident():
+    """claims.jsonl(메모 문장 사본)은 git 제외 대상이다.
+
+    깨지면: 플러그인 ingest 가 자동으로 만든 원장이 `git add .` 한 번에 메모 원문과 함께
+    커밋된다. raw/·wiki/·index.md 는 이미 제외인데 원장만 빠져 있었다(2차 e2e).
+    """
+    import subprocess
+
+    r = subprocess.run(["git", "check-ignore", "-q", "claims.jsonl"], cwd=ROOT, capture_output=True)
+    assert r.returncode == 0

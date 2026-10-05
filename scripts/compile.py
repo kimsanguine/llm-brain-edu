@@ -500,13 +500,15 @@ def main() -> int:
              if args.recompile else ingest.find_unprocessed())
     twins = [f for f in files if _has_sidecar(f)]      # 사이드카로 정리되는 원본
     files = [f for f in files if not _has_sidecar(f)]
+    can_live, why = _live_check(llm_client.load_llm_config())
+    live = can_live and not args.rule
     if not files and not twins:
+        # 엔진을 바꾼 직후 `--dry-run` 으로 확인하는 사용자도 경로를 볼 수 있게 먼저 찍는다
+        print(f"  경로: {'LIVE' if live else 'RULE'} ({'--rule 지정 — 모델 호출 없음' if args.rule else why})")
         print("[compile] 새로 정리할 메모가 없습니다.")
         print("  메모를 먼저 넣어 보세요: uv run python scripts/ingest.py --note \"오늘 배운 것\"")
         return 0
 
-    can_live, why = _live_check(llm_client.load_llm_config())
-    live = can_live and not args.rule
     print(f"[compile] 메모 {len(files)}건 → 위키 컴파일")
     print(f"  경로: {'LIVE' if live else 'RULE'} "
           f"({'--rule 지정 — 모델 호출 없음' if args.rule else why})")

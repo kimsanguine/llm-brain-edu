@@ -16,7 +16,7 @@
 3. 모델의 학습 지식으로 wiki 내용을 채우지 않는다. 모든 주장은 raw/ 근거를 가진다.
 4. 질문 답변은 읽기 경로다. query 중 raw/, wiki/, wiki_stats.json, Canvas를 변경하지 않는다.
 5. 공개 export, 삭제, purge, 공유용 Git push는 사람이 명시적으로 승인한 뒤에만 한다.
-6. API 키, 개인 경로, 원문 개인정보를 출력, 커밋, 공유하지 않는다.
+6. API 키, 개인 경로, 원문 개인정보를 출력, 커밋, 공유하지 않는다. 사용자가 넣기로 한 메모를 임의로 고치거나 빼지 않는다 — 저장 여부는 사용자가 정하고, ingest가 경고를 보여 준다.
 
 ## 수업의 표준 흐름
 
@@ -24,10 +24,10 @@
 - 공개 AI 논문 받기: uv run python scripts/download_paper.py
 - 무료로 위키 만들기: uv run python scripts/compile.py --rule
 - 화면 확인: uv run python -m wiki_app
-- API 기반 LIVE 컴파일은 OPENAI_API_KEY가 설정된 경우에만 사용한다. Claude Code 사용자는 schema/config.yaml의 engine을 cli로 두면 키 없이 claude -p로 LIVE가 된다.
+- API 기반 LIVE 컴파일은 OPENAI_API_KEY가 설정된 경우에만 사용한다. Claude Code 사용자는 schema/config.yaml의 engine을 cli로 두면 키 없이 claude -p로 LIVE가 된다. 엔진을 바꾸거나 LIVE로 다시 정리하기 전에, 메모 내용이 해당 AI 서비스(OpenAI 또는 Anthropic)로 전송된다는 점을 사용자에게 먼저 알린다.
 - wiki 페이지는 손으로 쓰지 않고 compile.py로 만든다. AI 답변 전에는 uv run python scripts/claims.py build로 근거 원장을 갱신한다.
 
-Codex에 파일 작업을 요청할 때는 목표, 대상 파일 또는 폴더, 완료 기준을 함께 적는다. 예: "AGENTS.md를 읽고, raw/notes의 새 메모를 확인한 뒤 근거가 있는 내용만 wiki에 반영해. 변경 파일과 출처를 보고해."
+Codex에 파일 작업을 요청할 때는 목표, 대상 파일 또는 폴더, 완료 기준을 함께 적는다. 예: "AGENTS.md를 읽고, raw/notes의 새 메모를 확인한 뒤 compile.py로 wiki에 반영해. 변경 파일과 출처를 보고해."
 
 ## 선택 호환
 

@@ -48,3 +48,6 @@ episodes/
 
 # wiki 목차 — gitignored wiki/의 파생물. business/ 민감 제목 노출 방지로 추적 제외(2026-06-28)
 /index.md
+
+# 근거 원장 — 메모 문장 사본이 들어 있다(raw/·wiki/와 같은 개인 데이터)
+claims.jsonl
