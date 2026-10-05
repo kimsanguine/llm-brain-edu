@@ -28,7 +28,9 @@ _WIKI_ROOT = Path(__file__).parent.parent / "wiki"
 
 
 def _has_wiki_data(root: Path) -> bool:
-    return root.exists() and (root / "concepts").exists() and any((root / "concepts").glob("*.md"))
+    # 작성자 전용 검증은 특정 40페이지 자료를 전제로 합니다. 수강생이 첫
+    # 메모를 넣었다고 이 사적인 검증을 실행하면 정상 설치도 실패합니다.
+    return (root / 'business/habix-profile.md').is_file() and len(list(root.rglob('*.md'))) >= 40
 
 
 # 사용자(작성자)의 실제 wiki/ 데이터 존재 여부. wiki/ 는 .gitignore 되어 있어

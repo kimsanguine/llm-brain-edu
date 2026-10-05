@@ -85,7 +85,14 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
 git clone https://github.com/kimsanguine/llm-brain-edu.git
 cd llm-brain-edu
+uv sync
+uv run python scripts/doctor.py --fix
 ```
+
+이미 `llm-brain-edu` 폴더가 있으면 다시 clone하거나 폴더를 삭제하지 않는다.
+기존 폴더에서 `git status`를 확인하고, 코드 변경이 없다면 `git pull --ff-only`로
+업데이트한 뒤 `uv sync`를 실행한다. 로컬 코드 변경 때문에 pull이 거절되면 Codex에
+변경 보존 방법을 물어본다. 개인 `raw/`, `wiki/`, `index.md`는 Git 업데이트 대상이 아니다.
 
 Codex에 다음처럼 요청한다.
 
@@ -125,34 +132,59 @@ canonical/local security 설정과 모든 후보의 명시적 scope를 확인한
 ▶ **터미널**에 입력:
 
 ```bash
-cp -r examples/seed-wiki/wiki ./wiki            # 데모 wiki 복사
-cp examples/seed-wiki/index.md ./index.md       # 데모 목차(index.md) 생성
-uv run python -m wiki_app                        # 로컬 HTML UI → http://localhost:8000
+uv run python scripts/compile.py --seed       # 공개 메모 5편, 기존 위키는 덮어쓰지 않음
+uv run python -m wiki_app                     # 터미널에 나온 실제 주소로 접속
 ```
+
+macOS와 Windows PowerShell에서 같은 명령을 사용한다. 검색창에 `인터뷰`를 넣으면
+`TIL — 사용자 인터뷰 기본기`가 나온다. 기존 위키가 있으면 `--seed`가 거절되는 것이
+정상이다. `--force`로 자기 자료를 덮어쓰지 말고 다음 논문 실습을 진행한다.
+수업 실습의 seed는 `examples/course-seed-wiki/`입니다. 기존 제품 소개용
+`examples/seed-wiki/`도 보존하지만, `--seed`는 원문 출처가 있는 수업 예제를 사용합니다.
+공개 원문 5편도 `raw/til/`에 함께 복사하며, 같은 이름의 다른 사용자 원문이 있으면
+덮어쓰지 않고 중단합니다. 원문 출처가 있어 이후 `claims.py build`도 진행할 수 있습니다.
+8000번이 사용 중이면 8001번 등으로 열린다. 이 안내는 오류가 아니며, 터미널의
+`브라우저에서 열어 보세요` 주소를 그대로 사용한다. 종료는 `Ctrl+C`다.
 
 (Obsidian으로 열려면 이 폴더를 "Open folder as vault".)
 
 ### 2) 내 메모로 운영하기
 
-핵심 흐름은 **넣기 → 위키 만들기 → 화면으로 보기** 3단계다. 모두 **터미널** 명령이고, Codex·Claude Code 없이도 된다.
-
-▶ **터미널**에 입력:
+핵심 흐름은 **원문 넣기 → 위키 만들기 → 검색하고 원문과 비교하기**다.
+없는 `~/Downloads/paper.pdf`를 준비할 필요 없이, 실제 AI 논문
+[Attention Is All You Need](https://arxiv.org/abs/1706.03762)을 받는다.
 
 ```bash
-uv run python scripts/ingest.py --note "오늘 배운 것: ..."      # ① 넣기: 메모를 raw/에 저장
-cp ~/Downloads/paper.pdf raw/docs/                             #    파일(PDF·DOCX·PPTX·MD·TXT)은 raw/docs/에 복사
-uv run python scripts/compile.py                               # ② 위키 만들기: raw/ → wiki/
-uv run python -m wiki_app                                      # ③ 화면으로 보기: 검색·페이지뷰
+uv run python scripts/download_paper.py
+uv run python scripts/compile.py --rule
+uv run python -m wiki_app
 ```
 
-- `raw/` = 아직 정리 안 된 원본 메모가 모이는 폴더, `wiki/` = 정리된 결과다.
-- 바로 위 1분 체험을 했다면 먼저 예제를 치운다: `rm -rf wiki index.md`. 예제 페이지는 `raw/` 출처가 없어서, 내 페이지와 섞이면 AI 답변용 근거 정리(`claims.py build`)가 실패한다.
-- `compile.py`는 `OPENAI_API_KEY`가 있으면 AI가 요약·분류(LIVE), 없으면 원문을 그대로 페이지로 옮긴다(RULE). 키가 없어도 위키와 검색은 동작한다.
-- 웹 화면 주소는 보통 `http://localhost:8000`이고, 8000이 사용 중이면 터미널에 찍힌 다른 주소(예: 8001)를 쓴다.
+다운로드는 `raw/docs/attention-is-all-you-need.pdf`에 원문을 저장한다. 원문 PDF는
+GitHub에 재배포하지 않으며 다운로드 명령과 공식 출처만 제공한다. 첫 명령은
+인터넷 연결이 필요하다. 실패하면 저장된 가짜 PDF를 만들지 않고 재실행을 안내한다.
+동일 논문이 이미 있으면 재사용하고 다른 문서가 있으면 덮어쓰지 않는다.
 
-**내 메모 폴더를 통째로 가져오려면** `schema/sources.example.yaml`을 `schema/sources.yaml`로 복사해 폴더 경로를 적고, 그 항목의 `disabled: true` 줄을 지운다(남아 있으면 아무것도 복사하지 않는다). 그다음 `uv run python scripts/sync_raw.py`로 `raw/`에 미러링하고 ②부터 실행한다.
+두 번째 명령의 `--rule`은 API 키가 있어도 모델을 호출하지 않는다. PDF 텍스트를
+`wiki/concepts/attention-is-all-you-need.md` 한 페이지로 옮기고 목차·지도를 갱신한다.
+**AI가 요약한 결과가 아니다.** 검색창에 `Transformer`를 입력하고 논문 페이지를
+열어 본문과 `sources`의 원문 경로를 확인한다. RULE에서는 수식·도표의 의미를
+해석하지 않으며 스캔 PDF의 OCR도 하지 않는다. 그림 자체는 원문 PDF에서 확인한다.
+새 논문 하나를 추가했으면 기존 데모 5편 여부와 관계없이 새 페이지는 **1개**다.
 
-> Claude Code 플러그인 사용자는 같은 흐름을 `/llm-brain:ingest`·`/llm-brain:query "..."`·`/llm-brain:express blog "..."`로도 실행할 수 있다(선택 호환).
+Codex 대화창에는 다음처럼 요청한다.
+
+```text
+AGENTS.md를 읽고 따라 주세요. raw/docs/attention-is-all-you-need.pdf와
+wiki/concepts/attention-is-all-you-need.md를 비교해 원문 연결과 검색 결과를
+확인해 주세요. 확인한 파일과 결과만 보고하고, 모델 API는 호출하지 마세요.
+```
+
+메모는 `uv run python scripts/ingest.py --note "오늘 배운 것"`으로 넣은 다음
+`uv run python scripts/compile.py --rule`로 정리한다. 선택 LIVE 실습과 외부 전송·비용
+경계는 [수강생 안내](README_수강생용.md#키를-넣으면-뭐가-달라지나요-선택)를 따른다.
+Codex 사용과 LIVE 컴파일 API 설정은 서로 다르다. Claude Code도 같은 Python 명령을
+실행할 수 있으며 기존 슬래시 명령은 선택 호환으로 유지한다.
 
 ---
 
@@ -167,12 +199,13 @@ uv run python -m wiki_app                                      # ③ 화면으�
 ▶ `cp`는 **터미널**, `/llm-brain:ingest`는 **Claude Code 입력창**에 입력:
 
 ```bash
-# 채널 1: 수동 투입 (MD · TXT · PDF · DOCX · PPTX) — 터미널
-cp paper.pdf raw/docs/
+# 채널 1: 실제 공개 PDF를 받기 — 터미널
+uv run python scripts/download_paper.py
+uv run python scripts/compile.py --rule
 
 # 채널 2: /llm-brain:ingest 슬래시 명령 (Claude Code 입력창)
 /llm-brain:ingest https://example.com --resonance high
-/llm-brain:ingest ~/Downloads/paper.pdf
+/llm-brain:ingest "공개 자료에서 읽은 내용: ..."
 /llm-brain:ingest "오늘 배운 것: ..."
 
 # 채널 3 [고급·선택]: Obsidian vault 자동 미러링 (schema/sources.yaml = 소스 등록 설정 파일)

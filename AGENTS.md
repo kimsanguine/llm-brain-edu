@@ -21,7 +21,8 @@
 ## 수업의 표준 흐름
 
 - 메모 넣기: uv run python scripts/ingest.py --note "내용"
-- 위키 만들기: uv run python scripts/compile.py
+- 공개 AI 논문 받기: uv run python scripts/download_paper.py
+- 무료로 위키 만들기: uv run python scripts/compile.py --rule
 - 화면 확인: uv run python -m wiki_app
 - API 기반 LIVE 컴파일은 OPENAI_API_KEY가 설정된 경우에만 사용한다.
 
@@ -30,4 +31,3 @@ Codex에 파일 작업을 요청할 때는 목표, 대상 파일 또는 폴더, 
 ## 선택 호환
 
 Claude Code 플러그인과 commands/의 슬래시 명령은 기존 사용자를 위한 선택 호환 경로다. 수업 본문과 수강생 지원은 Codex 경로를 기준으로 한다. 다른 에이전트 도구도 이 파일의 가드레일과 같은 Python 실행 경로를 지킬 수 있지만, 수업의 공식 지원 범위는 Codex다.
-

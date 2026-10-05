@@ -41,7 +41,7 @@ from lib import llm_client, pii  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 WIKI_DIR = ROOT / "wiki"
 SCHEMA_DIR = ROOT / "schema"
-SEED_DIR = ROOT / "examples" / "seed-wiki"
+SEED_DIR = ROOT / "examples" / "course-seed-wiki"
 INDEX_FILE = ROOT / "index.md"
 
 # index.md 가 쓰는 카테고리. RULE 경로는 판단하지 않으므로 concepts 로 모은다.
@@ -358,9 +358,38 @@ def do_seed(force: bool) -> int:
         print(f"  예제 위키가 없습니다: {SEED_DIR.relative_to(ROOT)}")
         print("  저장소를 다시 내려받거나(git pull), 이 화면을 복사해 질문 채널에 올려 주세요.")
         return 1
+    # 수업 seed는 공개 원문도 함께 제공합니다. claims.py가 실제 raw 출처를
+    # 확인할 수 있게 설치하되, 같은 이름의 사용자 원문은 절대 덮어쓰지 않습니다.
+    inputs = []
+    for seed_page in (SEED_DIR / 'wiki').rglob('*.md'):
+        for source in _page_sources(seed_page):
+            relative = Path(source)
+            if relative.is_absolute() or '..' in relative.parts or not source.startswith('raw/'):
+                continue
+            template, target = SEED_DIR / relative, ROOT / relative
+            if not template.is_file() or (target.exists() and target.read_bytes() != template.read_bytes()):
+                print('  예제 원문이 없거나 같은 이름의 다른 사용자 원문이 있어 변경하지 않았습니다.')
+                return 1
+            inputs.append((template, target))
+    for template, target in inputs:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            shutil.copy(template, target)
     shutil.copy(SEED_DIR / "index.md", INDEX_FILE)
     WIKI_DIR.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SEED_DIR / "wiki", WIKI_DIR, dirs_exist_ok=True)
+    if inputs:
+        state = ingest.load_state()
+        previous = state.get('processed', [])
+        done = {p for p in previous if isinstance(p, str)} if isinstance(previous, list) else set()
+        previous_records = state.get('compiled', {})
+        records = previous_records if isinstance(previous_records, dict) else {}
+        for _, target in inputs:
+            relative = target.relative_to(ROOT).as_posix()
+            done.add(relative)
+            records[relative] = {'sha256': ingest.file_digest(target)}
+        state.update(processed=sorted(done), compiled=records)
+        ingest.save_state(state)
     n = len(list(WIKI_DIR.rglob("*.md")))
     print(f"  예제 위키 {n}개 페이지를 넣었습니다.")
     print("  이제 `uv run python -m wiki_app` 을 실행하고 터미널에 찍힌 주소(보통 http://localhost:8000)를 여세요.")
@@ -443,6 +472,7 @@ def main() -> int:
     ap.add_argument("--seed", action="store_true", help="예제 위키를 넣는다(리커버리)")
     ap.add_argument("--recompile", action="store_true", help="처리 완료된 raw도 다시 컴파일한다(키가 있으면 API 호출)")
     ap.add_argument("--force", action="store_true", help="--seed 시 기존 위키를 덮어쓴다")
+    ap.add_argument("--rule", action="store_true", help="키가 있어도 무료 RULE만 사용한다(모델 호출 없음)")
     args = ap.parse_args()
 
     if args.seed:
@@ -459,10 +489,10 @@ def main() -> int:
         return 0
 
     key_env = llm_client.load_llm_config().get("api_key_env", "OPENAI_API_KEY")
-    live = bool(os.environ.get(key_env))
+    live = bool(os.environ.get(key_env)) and not args.rule
     print(f"[compile] 메모 {len(files)}건 → 위키 컴파일")
     print(f"  경로: {'LIVE' if live else 'RULE'} "
-          f"({key_env} {'감지됨' if live else '없음 — 원문을 그대로 옮깁니다'})")
+          f"({'--rule 지정 — 모델 호출 없음' if args.rule else key_env + (' 감지됨' if live else ' 없음 — 원문을 그대로 옮깁니다')})")
 
     if args.dry_run:
         for f in files:
@@ -483,7 +513,11 @@ def main() -> int:
         compiled_records[orig.relative_to(ROOT).as_posix()] = {"sha256": ingest.file_digest(orig)}
     for f in files:
         digest = ingest.file_digest(f)
-        text = ingest.extract_text(f)
+        try:
+            text = ingest.extract_text(f)
+        except Exception as exc:
+            print(f"   ✗ {f.name}: 읽기 실패({type(exc).__name__}). 원본을 확인한 뒤 다시 실행하세요.")
+            continue
         if not text:
             print(f"   ✗ {f.name}: 내용을 읽지 못해 건너뜁니다")
             continue
@@ -551,7 +585,7 @@ def main() -> int:
         print(f"  ⚠️ LIVE 실패 {live_failed}건, RULE로 대체했습니다(AI 정리 없이 원문을 옮김).")
         print("     키·잔액·네트워크를 확인한 뒤 `uv run python scripts/compile.py --recompile` 로 다시 정리하세요.")
     print("  화면으로 보기: uv run python -m wiki_app  →  터미널에 찍힌 주소(보통 http://localhost:8000)")
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

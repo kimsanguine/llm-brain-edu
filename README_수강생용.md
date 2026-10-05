@@ -46,6 +46,11 @@ git clone https://github.com/kimsanguine/llm-brain-edu.git
 cd llm-brain-edu
 ```
 
+**`destination path ... already exists`가 나오면** 이미 받은 폴더가 있다는 뜻입니다.
+폴더를 지우거나 다시 clone하지 마세요. `cd llm-brain-edu`로 들어가 `git status`를
+확인합니다. 로컬 코드 변경이 없으면 `git pull --ff-only`로 업데이트하고 다음 단계의
+`uv sync`를 실행합니다. pull이 거절되면 변경을 보존하도록 Codex에 요청하세요.
+
 **이 두 줄이 하는 일**
 
 | 줄 | 하는 일 |
@@ -144,7 +149,28 @@ uv run python scripts/doctor.py
 >
 > 지금은 RULE 로 갑니다. 키는 나중에 넣어도 되고, 안 넣어도 이 과정은 끝까지 됩니다.
 
-### 4단계. 메모 3건 넣고 위키 만들기 (5분)
+### 4단계. 제공된 실제 논문으로 위키 만들기 (5분)
+
+처음에는 자기 파일을 준비하지 않아도 됩니다. 아래 두 줄을 그대로 실행하세요.
+
+```bash
+uv run python scripts/download_paper.py
+uv run python scripts/compile.py --rule
+```
+
+첫 줄은 [Attention Is All You Need](https://arxiv.org/abs/1706.03762)라는 실제 AI 논문을
+`raw/docs/attention-is-all-you-need.pdf`에 받습니다. 인터넷 연결이 필요합니다.
+다른 파일을 덮어쓰지 않고 이미 받은 동일 논문은 재사용합니다. 원문은 GitHub에
+포함하지 않고 공식 arXiv에서 직접 받습니다.
+
+둘째 줄은 원문 텍스트를 `wiki/concepts/attention-is-all-you-need.md`로 옮깁니다.
+**`--rule`이면 키가 있어도 AI 호출·비용이 없습니다.** AI 요약이 아니라 PDF에서
+읽은 글을 검색 가능한 페이지로 만든 결과입니다. 원본 그림은 PDF에서 확인하며
+스캔 PDF의 OCR, 수식·도표 해석까지 한다는 뜻은 아닙니다.
+처음 실행하면 `✓ wiki/concepts/attention-is-all-you-need.md [RULE]`이 나옵니다.
+같은 원문을 다시 실행하면 `새로 정리할 메모가 없습니다`가 나오는 것이 정상입니다.
+
+### 선택 실습. 메모를 더 넣어 보기
 
 **여러분 업무 이야기로** 넣으세요. 아래는 직무별 예시입니다. 그대로 베끼지 말고
 자기 일로 바꿔 적어야 9주 뒤에 쓸모가 생깁니다.
@@ -171,7 +197,7 @@ uv run python scripts/ingest.py --note "여기에 내 이야기를 씁니다"
 같은 주제끼리 이어져서, 나중에 "그때 그거"를 찾을 수 있게 됩니다.
 
 ```bash
-uv run python scripts/compile.py
+uv run python scripts/compile.py --rule
 ```
 
 **`compile` 이 하는 일**: 입구(`raw` 폴더)에 쌓인 메모를 읽어 위키 페이지(`wiki` 폴더)로
@@ -181,14 +207,16 @@ uv run python scripts/compile.py
 
 ```
 [compile] 메모 3건 → 위키 컴파일
-  경로: RULE (OPENAI_API_KEY 없음 — 원문을 그대로 옮깁니다)
+  경로: RULE (--rule 지정 — 모델 호출 없음)
    ✓ wiki/concepts/2026-09-07-1358-note-2.md  [RULE]
    ✓ wiki/concepts/2026-09-07-1358-note-3.md  [RULE]
    ✓ wiki/concepts/2026-09-07-1358-note.md  [RULE]
   index.md 갱신 · 총 3개 페이지
-[ingest] 3개 파일 처리 완료로 표시.
 [compile] 완료 — 3개 페이지를 만들었습니다.
 ```
+
+논문 페이지가 이미 있으면 총 페이지 수는 4개입니다. 기존 자료가 더 있으면 수치는
+달라집니다. **이번에 넣은 메모 3건에 대해 새 페이지 3개**가 생겼는지를 확인하세요.
 
 ### 5단계. 눈으로 확인하고 캡처 (3분)
 
@@ -202,7 +230,10 @@ uv run python -m wiki_app
   브라우저에서 열어 보세요 →  http://localhost:8000
 ```
 
-방금 넣은 메모 3개가 페이지로 보이면 완료입니다.
+검색창에 **`Transformer`**를 입력해 `attention-is-all-you-need` 페이지를 엽니다.
+논문 제목과 본문이 보이고, 출처(`sources`)가 `raw/docs/attention-is-all-you-need.pdf`를
+가리키면 성공입니다. 실제 원문 PDF도 열어 같은 자료인지 확인하세요. 선택 메모 실습을
+했다면 입력한 단어로 각각 검색합니다.
 
 > **8000 이 아니라 8001 이라고 나올 수도 있습니다.** 정상입니다.
 > 컴퓨터에서 다른 프로그램(주피터 노트북 등)이 이미 8000 번 자리를 쓰고 있으면
@@ -401,6 +432,7 @@ AI 서비스로 전송됩니다.** 요약과 분류를 AI 가 하기 때문입�
 | 설치 점검 | `uv run python scripts/doctor.py` |
 | 메모 넣기 | `uv run python scripts/ingest.py --note "내용"` |
 | 파일 넣기 | `uv run python scripts/ingest.py --file ~/문서/파일.pdf` |
-| 위키 만들기 | `uv run python scripts/compile.py` |
+| 실제 AI 논문 받기 | `uv run python scripts/download_paper.py` |
+| 무료로 위키 만들기 | `uv run python scripts/compile.py --rule` |
 | 화면 보기 | `uv run python -m wiki_app` → 터미널에 찍힌 주소 (보통 http://localhost:8000) |
 | 예제로 화면 먼저 보기 | `uv run python scripts/compile.py --seed` |

@@ -55,10 +55,9 @@ def extract_text(file: Path) -> str | None:
         return file.read_text(errors="replace")
 
     if suffix == ".pdf":
-        import fitz  # pymupdf
-        doc = fitz.open(str(file))
-        pages = [page.get_text() for page in doc]
-        doc.close()
+        import pymupdf
+        with pymupdf.open(str(file)) as doc:
+            pages = [page.get_text() for page in doc]
         return "\n\n".join(pages)
 
     if suffix == ".docx":

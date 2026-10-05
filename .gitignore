@@ -1,8 +1,8 @@
 # 사용자 데이터 — 개인 정보 포함, git 제외
-raw/
+/raw/
 
 # wiki 콘텐츠 — 개인 지식베이스 (사용자마다 다름)
-wiki/
+/wiki/
 wiki/.graph_prev.json
 wiki/canvas/
 
@@ -47,8 +47,4 @@ episodes/
 # 절차 메모리(procedures/)는 git-tracked(공유 워크플로우, US-004 예시 커밋) + OKF 제외 — gitignore 안 함(결정 2026-06-27)
 
 # wiki 목차 — gitignored wiki/의 파생물. business/ 민감 제목 노출 방지로 추적 제외(2026-06-28)
-index.md
-
-# 예제 위키는 저장소에 포함한다(위의 wiki/, index.md 규칙이 이 폴더까지 무시하지 않게)
-!examples/seed-wiki/index.md
-!examples/seed-wiki/wiki/
+/index.md

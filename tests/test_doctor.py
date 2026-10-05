@@ -55,8 +55,8 @@ def test_doctor_fix_does_not_overwrite_existing(tmp_path):
     assert existing.read_text(encoding="utf-8") == "MINE\n"  # 기존 파일 보존(Rule 9)
 
 
-def test_doctor_treats_uninitialized_personal_data_dirs_as_warnings():
-    statuses = {entry["name"]: entry["status"] for entry in doctor.run_checks(doctor.ROOT)}
+def test_doctor_treats_uninitialized_personal_data_dirs_as_warnings(tmp_path):
+    statuses = {entry["name"]: entry["status"] for entry in doctor.run_checks(tmp_path)}
 
     assert statuses["dir:raw"] == "WARN"
     assert statuses["dir:wiki"] == "WARN"

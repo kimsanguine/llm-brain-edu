@@ -1,0 +1,124 @@
+{
+  "meta": {
+    "generated": "2026-10-05T01:57:00.827915+00:00",
+    "total_pages": 5,
+    "total_nodes": 6,
+    "total_links": 5,
+    "kinds": {
+      "tag": 1,
+      "page": 5
+    },
+    "types": {
+      "concept": 5
+    },
+    "domains": {},
+    "edge_kinds": {
+      "tag": 5
+    }
+  },
+  "nodes": [
+    {
+      "id": "tag:demo",
+      "kind": "tag",
+      "title": "#demo",
+      "type": "tag",
+      "category": "tag",
+      "domain": [],
+      "tags": [],
+      "inbound": 5,
+      "outbound": 0
+    },
+    {
+      "id": "user-interview",
+      "kind": "page",
+      "title": "TIL — 사용자 인터뷰 기본기",
+      "type": "concept",
+      "category": "concepts",
+      "domain": [],
+      "tags": [
+        "demo"
+      ],
+      "inbound": 0,
+      "outbound": 1
+    },
+    {
+      "id": "prd",
+      "kind": "page",
+      "title": "TIL — PRD를 다시 쓰는 법",
+      "type": "concept",
+      "category": "concepts",
+      "domain": [],
+      "tags": [
+        "demo"
+      ],
+      "inbound": 0,
+      "outbound": 1
+    },
+    {
+      "id": "jtbd",
+      "kind": "page",
+      "title": "TIL — Jobs to be Done(JTBD)",
+      "type": "concept",
+      "category": "concepts",
+      "domain": [],
+      "tags": [
+        "demo"
+      ],
+      "inbound": 0,
+      "outbound": 1
+    },
+    {
+      "id": "retention-cohort",
+      "kind": "page",
+      "title": "TIL — 리텐션 코호트 분석",
+      "type": "concept",
+      "category": "concepts",
+      "domain": [],
+      "tags": [
+        "demo"
+      ],
+      "inbound": 0,
+      "outbound": 1
+    },
+    {
+      "id": "okr-kpi",
+      "kind": "page",
+      "title": "TIL — OKR vs KPI, 그리고 OMTM",
+      "type": "concept",
+      "category": "concepts",
+      "domain": [],
+      "tags": [
+        "demo"
+      ],
+      "inbound": 0,
+      "outbound": 1
+    }
+  ],
+  "links": [
+    {
+      "source": "user-interview",
+      "target": "tag:demo",
+      "kind": "tag"
+    },
+    {
+      "source": "prd",
+      "target": "tag:demo",
+      "kind": "tag"
+    },
+    {
+      "source": "jtbd",
+      "target": "tag:demo",
+      "kind": "tag"
+    },
+    {
+      "source": "retention-cohort",
+      "target": "tag:demo",
+      "kind": "tag"
+    },
+    {
+      "source": "okr-kpi",
+      "target": "tag:demo",
+      "kind": "tag"
+    }
+  ]
+}
