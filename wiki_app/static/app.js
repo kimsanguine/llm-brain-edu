@@ -406,8 +406,10 @@ async function callAI(question, contextSlugs) {
             details.push(`<strong>제외 사유:</strong> ${reasonEntries.map(([reason, count]) => `${escapeHtml(reason)} ${count}`).join(", ")}`);
           }
           const action = ev.data.recommended_next_action;
-          if (action && action.command) {
-            details.push(`<strong>다음 행동:</strong> <code>${escapeHtml(action.command)}</code>`);
+          if (action && (action.message || action.command)) {
+            const note = action.message ? `${escapeHtml(action.message)} ` : "";
+            const cmd = action.command ? `<code>${escapeHtml(action.command)}</code>` : "";
+            details.push(`<strong>다음 행동:</strong> ${note}${cmd}`);
           }
           if (details.length) {
             sourcesEl.style.display = "block";

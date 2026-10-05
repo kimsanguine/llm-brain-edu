@@ -1164,9 +1164,12 @@ def test_ai_answer_returns_abstained_with_safe_exclusion_summary(tmp_path, monke
     assert data["answer"] == "관련 정보 없음"
     assert data["sources"] == []
     assert data["exclusion_reason_counts"] == {"untrusted": 1}
-    assert data["recommended_next_action"] == {
-        "command": "uv run python scripts/claims.py build"
-    }
+    # 외부 수집물만 있어서 거부한 경우 `claims.py build` 를 권하면, 이미 실행한 사용자가 같은
+    # 결과로 되돌아온다(2026-10-06 e2e). 사유에 맞게 "메모로 옮기라"고 안내한다.
+    action = data["recommended_next_action"]
+    assert "외부에서 수집한 글" in action["message"]
+    assert action["command"].startswith("uv run python scripts/ingest.py --note")
+    assert "claims.py build" not in json.dumps(action)
     assert "Beta external capture" not in json.dumps(data, ensure_ascii=False)
     assert "raw/newsletters" not in json.dumps(data, ensure_ascii=False)
 
@@ -1198,9 +1201,12 @@ def test_ai_answer_zero_usable_claims_skips_llm_and_records_abstention(
     assert data["answer"] == "관련 정보 없음"
     assert data["sources"] == []
     assert data["exclusion_reason_counts"] == {"untrusted": 1}
-    assert data["recommended_next_action"] == {
-        "command": "uv run python scripts/claims.py build"
-    }
+    # 외부 수집물만 있어서 거부한 경우 `claims.py build` 를 권하면, 이미 실행한 사용자가 같은
+    # 결과로 되돌아온다(2026-10-06 e2e). 사유에 맞게 "메모로 옮기라"고 안내한다.
+    action = data["recommended_next_action"]
+    assert "외부에서 수집한 글" in action["message"]
+    assert action["command"].startswith("uv run python scripts/ingest.py --note")
+    assert "claims.py build" not in json.dumps(action)
     assert len(captured_episodes) == 1
     assert captured_episodes[0]["outputs"] == {"answer_status": "abstained"}
     assert captured_episodes[0]["status"] == "abstained"
@@ -1225,7 +1231,8 @@ def test_ai_answer_stream_abstention_matches_nonstream_contract(tmp_path, monkey
     assert '"delivery_mode": "verified-buffered"' in body
     assert '"source_slugs": []' in body
     assert '"exclusion_reason_counts": {"untrusted": 1}' in body
-    assert '"recommended_next_action": {"command": "uv run python scripts/claims.py build"}' in body
+    assert "외부에서 수집한 글" in body and "ingest.py --note" in body
+    assert "claims.py build" not in body
     assert 'event: chunk\ndata: {"text": "관련 정보 없음"}' in body
     assert 'event: done\ndata: {"status": "abstained"}' in body
     assert "raw/newsletters" not in body

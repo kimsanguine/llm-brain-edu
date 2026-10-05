@@ -200,10 +200,21 @@ def _with_scope(page: str, scope: str | None) -> str:
     return head + f"scope: {scope}\n" + page[end + 1:]
 
 
-def _page_by_rule(raw_file: Path, text: str) -> tuple[Path, str]:
+def _source_pdf_title(raw_file: Path) -> str | None:
+    """PDF(또는 그 추출본)의 제목. 첫 줄이 저작권 안내인 논문도 제목을 바르게 잡는다."""
+    if raw_file.suffix.lower() == ".pdf":
+        return ingest.pdf_title(raw_file)
+    if raw_file.name.endswith(SIDECAR_SUFFIX):
+        original = raw_file.with_name(raw_file.name[: -len(SIDECAR_SUFFIX)] + ".pdf")
+        if original.is_file():
+            return ingest.pdf_title(original)
+    return None
+
+
+def _page_by_rule(raw_file: Path, text: str, title_hint: str | None = None) -> tuple[Path, str]:
     """원문을 그대로 옮긴 위키 페이지를 만든다(요약·분류 없음)."""
     body = _strip_frontmatter(text).strip()
-    title = _title_of(body, raw_file.stem)
+    title = title_hint or _title_of(body, _slug_stem(raw_file))
     # slug 는 제목이 아니라 raw 파일명에서 만든다. CLAUDE.md 규약이 "한국어 개념도 영문
     # slug" 이고, 한글 파일명은 macOS 에서 NFD 로 저장돼 도구마다 다르게 보인다.
     # 화면에 뜨는 건 frontmatter 의 title 이므로 학생에게는 한국어 제목이 보인다.
@@ -519,6 +530,7 @@ def main() -> int:
         return 0
 
     written = 0
+    unreadable: list[str] = []
     live_failed = 0              # 키가 있는데 LIVE 가 안 된 건수(요약 줄에서 숨기지 않는다)
     compiled_records: dict = {}
     ok_files: list = []          # 실제로 페이지가 만들어진 raw 만 완료 처리한다
@@ -538,7 +550,10 @@ def main() -> int:
             print(f"   ✗ {f.name}: 읽기 실패({type(exc).__name__}). 원본을 확인한 뒤 다시 실행하세요.")
             continue
         if not text:
-            print(f"   ✗ {f.name}: 내용을 읽지 못해 건너뜁니다")
+            unreadable.append(f.name)
+            why = ("글자를 읽지 못했습니다. 스캔본(이미지로 된 PDF)일 수 있습니다"
+                   if f.suffix.lower() == ".pdf" else "내용을 읽지 못해 건너뜁니다")
+            print(f"   ✗ {f.name}: {why}")
             continue
 
         result, how = None, "RULE"
@@ -554,7 +569,7 @@ def main() -> int:
                 print(f"   ! {f.name}: 호출 실패({type(exc).__name__}) — RULE 로 넘어갑니다")
                 print(f"     {exc}")
         if result is None:
-            result = _page_by_rule(f, text)
+            result = _page_by_rule(f, text, title_hint=_source_pdf_title(f))
 
         out_path, page = result
         page = _with_scope(page, _raw_scope(text))
@@ -599,7 +614,13 @@ def main() -> int:
     failed = len(files) - len(ok_files)
     print(f"[compile] 완료 — {written}개 페이지를 만들었습니다.")
     if failed:
-        print(f"  {failed}건은 내용을 읽지 못해 넘겼습니다. 고친 뒤 다시 실행하면 그때 처리됩니다.")
+        print(f"  {failed}건은 글자를 읽지 못해 위키에 반영하지 못했습니다(원본은 raw/ 에 그대로 있습니다).")
+        if any(n.lower().endswith(".pdf") for n in unreadable):
+            print("  스캔본·이미지 PDF는 글자 인식(OCR)이 필요한데, 이 도구에는 들어 있지 않습니다. 선택지:")
+            print("   ① OCR 도구로 글자를 뽑아 .md/.txt 로 저장해 raw/notes/ 에 넣기")
+            print("   ② 내용을 직접 `uv run python scripts/ingest.py --note \"...\"` 로 옮겨 적기")
+            print("   ③ 글자가 들어 있는 PDF 로 다시 받기")
+        print("  글자를 얻은 뒤 다시 실행하면 그때 처리됩니다.")
     if live_failed:
         print(f"  ⚠️ LIVE 실패 {live_failed}건, RULE로 대체했습니다(AI 정리 없이 원문을 옮김).")
         print("     키·잔액·네트워크를 확인한 뒤 `uv run python scripts/compile.py --recompile` 로 다시 정리하세요.")

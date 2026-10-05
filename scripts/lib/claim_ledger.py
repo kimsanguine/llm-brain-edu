@@ -475,6 +475,22 @@ def claim_exclusion_reason(
     return None
 
 
+def abstention_next_action(exclusion_counts: Mapping[str, int]) -> dict[str, str]:
+    """답변을 거부했을 때 사용자에게 줄 "다음 행동"을 사유에 맞게 고른다.
+
+    제외 사유가 전부 `untrusted`(웹 기사 등 외부 수집물)이면 원장을 다시 만들어도 같은
+    결과이므로 `claims.py build` 를 권하지 않는다. 그 안내는 이미 실행한 사용자를 같은 자리에
+    돌려보낸다. 내용을 확인해 메모로 옮기면 신뢰하는 근거가 된다는 쪽을 안내한다.
+    """
+    if exclusion_counts and set(exclusion_counts) == {"untrusted"}:
+        return {
+            "message": ("외부에서 수집한 글(웹 기사 등)은 답변에 인용할 수 없습니다. "
+                        "내용을 직접 확인해 메모로 옮기면 인용할 수 있습니다:"),
+            "command": 'uv run python scripts/ingest.py --note "확인한 핵심 내용"',
+        }
+    return {"command": CLAIM_REBUILD_COMMAND}
+
+
 def summarize_claim_provenance(
     records: Iterable[ClaimRecord],
     *,

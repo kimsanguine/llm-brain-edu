@@ -485,7 +485,7 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
                 "answer": claim_ledger.ABSTENTION_RESPONSE,
                 "sources": [],
                 "exclusion_reason_counts": exclusion_counts,
-                "recommended_next_action": _rebuild_action(),
+                "recommended_next_action": claim_ledger.abstention_next_action(exclusion_counts),
             }
 
         llm_config = llm_client.load_llm_config()
@@ -600,7 +600,8 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
                 "exclusion_reason_counts": provenance["exclusion_reason_counts"],
             }
             if provenance["usable_count"] == 0:
-                meta["recommended_next_action"] = _rebuild_action()
+                meta["recommended_next_action"] = claim_ledger.abstention_next_action(
+                    provenance["exclusion_reason_counts"])
             yield f"event: meta\ndata: {_json.dumps(meta, ensure_ascii=False)}\n\n"
 
             if provenance["usable_count"] == 0:

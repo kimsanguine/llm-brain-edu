@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
+from bs4 import BeautifulSoup
 from markdownify import markdownify
 
 from lib import pii
@@ -45,6 +46,55 @@ def load_state() -> dict:
 
 def save_state(state: dict) -> None:
     STATE_FILE.write_text(json.dumps(state, indent=2, default=str))
+
+
+def pdf_title(path: Path) -> str | None:
+    """PDF 의 제목을 돌려준다. 메타데이터 → 첫 쪽에서 가장 큰 글자 순서로 찾는다.
+
+    위키 제목을 본문 첫 줄에서 따오면 논문처럼 첫 줄이 저작권 안내인 PDF 가 엉뚱한 제목을
+    갖는다. 제목은 대개 첫 쪽에서 가장 큰 글자이므로 그것을 쓴다. 못 찾으면 None.
+    """
+    import pymupdf
+
+    def usable(t: str) -> bool:
+        t = t.strip()
+        low = t.lower()
+        return (len(t) >= 4 and any(ch.isalpha() for ch in t)
+                and not low.startswith(("microsoft word", "untitled", "제목 없음"))
+                and not low.endswith((".docx", ".doc", ".pdf", ".tex", ".indd", ".pptx")))
+
+    try:
+        with pymupdf.open(str(path)) as doc:
+            meta = " ".join(((doc.metadata or {}).get("title") or "").split())
+            if usable(meta):
+                return meta[:150]
+            if doc.page_count == 0:
+                return None
+            lines = []
+            for block in doc[0].get_text("dict").get("blocks", []):
+                for line in block.get("lines", []):
+                    if abs(line.get("dir", (1, 0))[0]) < 0.9:
+                        continue            # 세로·기울어진 글자(arXiv 도장, 워터마크)는 제목이 아니다
+                    text = "".join(s["text"] for s in line["spans"]).strip()
+                    if text:
+                        lines.append((max(s["size"] for s in line["spans"]), line["bbox"][1], text))
+    except Exception:
+        return None
+    if not lines:
+        return None
+    biggest = max(size for size, _, _ in lines)
+    picked, prev_y = [], None
+    for size, y, text in sorted(lines, key=lambda x: x[1]):
+        if biggest - size >= 0.5:
+            continue
+        if prev_y is not None and y - prev_y > biggest * 2.2:
+            break                       # 제목이 두 덩어리로 떨어져 있으면 첫 덩어리만
+        picked.append(text)
+        prev_y = y
+        if len(picked) == 3:
+            break
+    title = " ".join(" ".join(picked).split())[:150]
+    return title if usable(title) else None
 
 
 def extract_text(file: Path) -> str | None:
@@ -214,21 +264,81 @@ def _planned_note_path() -> Path:
     return path
 
 
+# 기사 본문 밖의 덩어리(메뉴·푸터·광고·공유 버튼 등). 본문 안에 섞여 있어도 걷어낸다.
+_BOILERPLATE_TAGS = ("script", "style", "noscript", "svg", "iframe", "form", "nav",
+                     "footer", "aside", "button", "dialog", "template")
+_MIN_ARTICLE_CHARS = 300      # 이보다 짧으면 본문 후보로 보지 않고 페이지 전체로 되돌아간다
+
+
+def extract_article(html: str) -> tuple[str, str]:
+    """웹 페이지 HTML 에서 (제목, 본문 마크다운)을 뽑는다.
+
+    페이지 전체를 마크다운으로 바꾸면 메뉴·푸터가 본문보다 많아, 위키에 쓸모없는 문장이
+    수백 개 들어가고 근거 원장(claim)까지 부풀어 오른다. `<article>` → `<main>` →
+    `role=main` 순서로 본문 후보를 고르고, 후보가 없거나 너무 짧으면 `<body>` 전체로 되돌아간다.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    def text_len(node) -> int:
+        return len(node.get_text(" ", strip=True))
+
+    container = None
+    for candidates in (soup.find_all("article"), soup.find_all("main"),
+                       soup.find_all(attrs={"role": "main"})):
+        best = max(candidates, key=text_len, default=None)
+        if best is not None and text_len(best) >= _MIN_ARTICLE_CHARS:
+            container = best
+            break
+    if container is None:
+        container = soup.body or soup
+
+    # 제목: 독자가 보는 기사 제목(본문 안 h1)을 먼저. 소셜 공유용 og:title 은 사이트가 SEO 용으로
+    # 따로 쓰는 경우가 많아 본문 제목과 다를 수 있다.
+    title = ""
+    h1 = container.find("h1") or soup.find("h1")
+    if h1 is not None:
+        title = h1.get_text(" ", strip=True)
+    if not title:
+        og = soup.find("meta", attrs={"property": "og:title"})
+        if og is not None and og.get("content"):
+            title = og["content"].strip()
+    if not title and soup.title is not None and soup.title.string:
+        title = soup.title.string.strip()
+    title = " ".join(title.replace("\u00b6", " ").split())      # 문단 링크 기호(¶) 제거
+
+    for tag in container.find_all(_BOILERPLATE_TAGS):
+        tag.decompose()
+    body = markdownify(str(container), heading_style="ATX", strip=["a", "img"])
+    body = re.sub(r"[ \t]+\n", "\n", body)
+    body = re.sub(r"\n{3,}", "\n\n", body).strip()
+    return title, body
+
+
+def _yaml_quote(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
+
+
 def scrape_url(url: str, resonance: str | None = None) -> Path:
     print(f"  스크랩 중: {url}")
     resp = httpx.get(url, follow_redirects=True, timeout=30,
                      headers={"User-Agent": "Mozilla/5.0"})
     resp.raise_for_status()
 
-    md_content = markdownify(resp.text, heading_style="ATX")
+    title, md_content = extract_article(resp.text)
+    if title and not md_content.startswith("# "):
+        md_content = f"# {title}\n\n{md_content}"
     date_str = datetime.now().strftime("%Y-%m-%d")
     out_file = _planned_url_path(url)
     out_file.parent.mkdir(parents=True, exist_ok=True)
     resonance_line = f"resonance: {resonance}\n" if resonance else ""
     out_file.write_text(
-        f"---\ntitle: 웹 스크랩\nurl: {url}\ncollected: {date_str}\n{resonance_line}---\n\n{md_content}"
+        f"---\ntitle: {_yaml_quote(title or '웹 스크랩')}\nurl: {url}\ncollected: {date_str}\n"
+        f"{resonance_line}---\n\n{md_content}\n"
     )
     print(f"  저장: {out_file.relative_to(WIKI_ROOT)}")
+    print("  ℹ️ 웹에서 가져온 글은 위키에서 읽고 검색할 수 있지만, AI 답변의 근거(인용)로는 쓰이지 않습니다.")
+    print("     외부 글 속에 숨은 지시문을 막기 위한 규칙입니다. 근거로 쓰려면 내용을 확인한 뒤")
+    print("     `uv run python scripts/ingest.py --note \"확인한 핵심 내용\"` 으로 옮겨 넣으세요.")
     return out_file
 
 
@@ -260,6 +370,12 @@ def ingest_file(src: Path, resonance: str | None = None) -> Path:
     # MD·TXT가 아닌 경우 텍스트 추출 MD도 저장
     if not is_md_txt:
         text = extract_text(src)
+        if not (text or "").strip():
+            kind = "스캔본이거나 이미지로만 된 PDF" if src.suffix.lower() == ".pdf" else "글자가 없는 문서"
+            print(f"  ⚠️ 이 파일에서 글자를 읽지 못했습니다({kind}일 수 있습니다).")
+            print("     원본은 raw/docs/ 에 저장했지만, 글자가 없으면 위키로 만들 수 없습니다.")
+            print("     글자 인식(OCR)은 이 도구에 들어 있지 않습니다. 글자를 뽑아 .md/.txt 로 넣거나,")
+            print("     내용을 `ingest.py --note` 로 옮겨 적으세요.")
         if text:
             resonance_line = f"resonance: {resonance}\n" if resonance else ""
             md_out = docs_dir / f"{date_str}-{src.stem}.extracted.md"
