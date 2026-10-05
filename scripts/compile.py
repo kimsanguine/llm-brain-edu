@@ -616,10 +616,11 @@ def main() -> int:
     if failed:
         print(f"  {failed}건은 글자를 읽지 못해 위키에 반영하지 못했습니다(원본은 raw/ 에 그대로 있습니다).")
         if any(n.lower().endswith(".pdf") for n in unreadable):
-            print("  스캔본·이미지 PDF는 글자 인식(OCR)이 필요한데, 이 도구에는 들어 있지 않습니다. 선택지:")
-            print("   ① OCR 도구로 글자를 뽑아 .md/.txt 로 저장해 raw/notes/ 에 넣기")
-            print("   ② 내용을 직접 `uv run python scripts/ingest.py --note \"...\"` 로 옮겨 적기")
-            print("   ③ 글자가 들어 있는 PDF 로 다시 받기")
+            print("  스캔본·이미지 PDF는 글자 인식(OCR)이 필요합니다. 기본 설치에는 들어 있지 않고, 선택지는 이렇습니다:")
+            print("   ① 선택 설치: `uv sync --extra ocr` 와 Tesseract 프로그램을 설치한 뒤 compile 을 다시 실행")
+            print("   ② 다른 OCR 도구(PaddleOCR 등)로 글자를 뽑아 .md/.txt 로 저장해 raw/notes/ 에 넣기")
+            print("   ③ 내용을 직접 `uv run python scripts/ingest.py --note \"...\"` 로 옮겨 적기")
+            print("   ④ 글자가 들어 있는 PDF 로 다시 받기")
         print("  글자를 얻은 뒤 다시 실행하면 그때 처리됩니다.")
     if live_failed:
         print(f"  ⚠️ LIVE 실패 {live_failed}건, RULE로 대체했습니다(AI 정리 없이 원문을 옮김).")

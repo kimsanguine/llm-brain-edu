@@ -20,6 +20,14 @@ dependencies = [
     "markdown-it-py>=4.2.0",
 ]
 
+[project.optional-dependencies]
+# 스캔본·이미지 PDF 글자 인식(OCR). 기본 설치에는 들어가지 않는다: `uv sync --extra ocr`
+# Tesseract 프로그램(맥: brew install tesseract tesseract-lang)도 따로 설치해야 한다.
+ocr = [
+    "pytesseract>=0.3.10",
+    "pillow>=10",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",

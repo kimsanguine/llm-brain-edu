@@ -88,6 +88,8 @@ def brain(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr(compile_mod.llm_client, "load_llm_config",
                         lambda *a, **k: {"engine": "openai", "api_key_env": "OPENAI_API_KEY"})
+    # 개발자가 `uv sync --extra ocr` 를 해 둬도 이 파일의 테스트(OCR 없는 기본 동작)는 같아야 한다.
+    monkeypatch.setattr(ingest, "ocr_status", lambda: (False, "OCR 선택 설치가 되어 있지 않습니다"))
     return tmp_path
 
 

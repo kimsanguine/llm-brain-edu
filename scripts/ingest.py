@@ -48,6 +48,62 @@ def save_state(state: dict) -> None:
     STATE_FILE.write_text(json.dumps(state, indent=2, default=str))
 
 
+OCR_MAX_PAGES = 30      # 인식은 느리므로 앞쪽부터 이만큼만(넘으면 알린다)
+OCR_INSTALL_HINT = ("`uv sync --extra ocr` 를 실행하고 Tesseract 프로그램을 설치하세요"
+                    "(맥: `brew install tesseract tesseract-lang`, 윈도우: Tesseract 설치 프로그램)")
+
+
+def ocr_status() -> tuple[bool, str]:
+    """글자 인식(OCR)을 쓸 수 있는지와, 안 될 때의 이유를 돌려준다.
+
+    OCR 은 기본 설치에 들어 있지 않은 선택 기능이다. 파이썬 패키지(`--extra ocr`)와
+    Tesseract 프로그램이 둘 다 있어야 한다. 없으면 스캔본은 안내만 하고 넘어간다.
+    """
+    try:
+        import pytesseract  # noqa: F401
+    except ImportError:
+        return False, "OCR 선택 설치(`uv sync --extra ocr`)가 되어 있지 않습니다"
+    if shutil.which("tesseract") is None:
+        return False, "Tesseract 프로그램이 설치되어 있지 않습니다"
+    return True, ""
+
+
+def _pdf_has_text_layer(path: Path) -> bool:
+    import pymupdf
+
+    try:
+        with pymupdf.open(str(path)) as doc:
+            return any(page.get_text().strip() for page in doc)
+    except Exception:
+        return False
+
+
+def ocr_pdf(path: Path) -> str:
+    """글자 레이어가 없는 PDF 를 쪽마다 그림으로 만들어 Tesseract 로 읽는다(한국어+영어)."""
+    import pymupdf
+    import pytesseract
+    from PIL import Image
+
+    available = set(pytesseract.get_languages(config=""))
+    if {"kor", "eng"} <= available:
+        lang = "kor+eng"
+    elif "eng" in available:
+        lang = "eng"
+    else:
+        lang = "+".join(sorted(available - {"osd"})) or "eng"
+    pages = []
+    with pymupdf.open(str(path)) as doc:
+        n = min(doc.page_count, OCR_MAX_PAGES)
+        print(f"  글자 인식(OCR) 중… {n}쪽, 언어 {lang}")
+        for i in range(n):
+            pix = doc[i].get_pixmap(dpi=200)
+            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            pages.append(pytesseract.image_to_string(image, lang=lang))
+        if doc.page_count > n:
+            print(f"  ⚠️ {doc.page_count}쪽 중 앞 {n}쪽만 읽었습니다.")
+    return "\n\n".join(pages)
+
+
 def pdf_title(path: Path) -> str | None:
     """PDF 의 제목을 돌려준다. 메타데이터 → 첫 쪽에서 가장 큰 글자 순서로 찾는다.
 
@@ -108,7 +164,10 @@ def extract_text(file: Path) -> str | None:
         import pymupdf
         with pymupdf.open(str(file)) as doc:
             pages = [page.get_text() for page in doc]
-        return "\n\n".join(pages)
+        text = "\n\n".join(pages)
+        if not text.strip() and ocr_status()[0]:
+            return ocr_pdf(file)         # 글자 레이어가 없을 때만, 선택 설치가 있을 때만
+        return text
 
     if suffix == ".docx":
         from docx import Document
@@ -369,20 +428,34 @@ def ingest_file(src: Path, resonance: str | None = None) -> Path:
 
     # MD·TXT가 아닌 경우 텍스트 추출 MD도 저장
     if not is_md_txt:
+        is_pdf = src.suffix.lower() == ".pdf"
+        scanned = is_pdf and not _pdf_has_text_layer(src)
         text = extract_text(src)
+        used_ocr = scanned and bool((text or "").strip())
         if not (text or "").strip():
-            kind = "스캔본이거나 이미지로만 된 PDF" if src.suffix.lower() == ".pdf" else "글자가 없는 문서"
+            ocr_ok, why = ocr_status() if is_pdf else (False, "")
+            kind = "스캔본이거나 이미지로만 된 PDF" if is_pdf else "글자가 없는 문서"
             print(f"  ⚠️ 이 파일에서 글자를 읽지 못했습니다({kind}일 수 있습니다).")
             print("     원본은 raw/docs/ 에 저장했지만, 글자가 없으면 위키로 만들 수 없습니다.")
-            print("     글자 인식(OCR)은 이 도구에 들어 있지 않습니다. 글자를 뽑아 .md/.txt 로 넣거나,")
-            print("     내용을 `ingest.py --note` 로 옮겨 적으세요.")
+            if is_pdf and ocr_ok:
+                print("     글자 인식(OCR)까지 했지만 읽히지 않았습니다(해상도가 낮거나 글자가 없는 그림일 수 있습니다).")
+            elif is_pdf:
+                print(f"     글자 인식(OCR)은 기본 설치에 없는 선택 기능이고, 지금은 {why}.")
+                print(f"     쓰려면: {OCR_INSTALL_HINT}")
+                print("     그 뒤 같은 파일을 다시 넣으세요. 또는 글자를 뽑아 .md/.txt 로 넣거나 `ingest.py --note` 로 옮겨 적으세요.")
+            else:
+                print("     내용을 `ingest.py --note` 로 옮겨 적으세요.")
         if text:
             resonance_line = f"resonance: {resonance}\n" if resonance else ""
+            ocr_line = "ocr: tesseract\n" if used_ocr else ""
             md_out = docs_dir / f"{date_str}-{src.stem}.extracted.md"
             md_out.write_text(
-                f"---\ntitle: {src.name} 추출본\nsource_file: {src.name}\nextracted: {date_str}\n{resonance_line}---\n\n{text}"
+                f"---\ntitle: {src.name} 추출본\nsource_file: {src.name}\nextracted: {date_str}\n"
+                f"{ocr_line}{resonance_line}---\n\n{text}"
             )
             print(f"  추출 MD: {md_out.relative_to(WIKI_ROOT)}")
+            if used_ocr:
+                print("  🔎 글자 인식(OCR)으로 읽었습니다. 오탈자가 있을 수 있으니 중요한 내용은 원본과 대조하세요.")
 
     print(f"  저장: {dst.relative_to(WIKI_ROOT)}")
     return dst

@@ -437,3 +437,5 @@ AI 서비스로 전송됩니다.** 요약과 분류를 AI 가 하기 때문입�
 | 무료로 위키 만들기 | `uv run python scripts/compile.py --rule` |
 | 화면 보기 | `uv run python -m wiki_app` → 터미널에 찍힌 주소 (보통 http://localhost:8000) |
 | 예제로 화면 먼저 보기 | `uv run python scripts/compile.py --seed` |
+
+> **스캔본이나 사진으로 만든 PDF**는 글자가 그림이라 그대로는 읽지 못하고, 넣을 때 경고가 뜹니다. 글자 인식(OCR)이 필요하면 선택 설치(`uv sync --extra ocr` 와 Tesseract 프로그램)를 하세요. 설치하지 않아도 다른 모든 기능은 그대로 됩니다. 자세한 선택지와 정확도의 한계는 `README.md`의 ingest 절에 있습니다.
