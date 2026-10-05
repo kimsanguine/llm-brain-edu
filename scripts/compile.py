@@ -112,6 +112,22 @@ def _slug_stem(raw_file: Path) -> str:
     return raw_file.stem
 
 
+def _live_check(cfg: dict) -> tuple[bool, str]:
+    """LIVE 로 돌 수 있는지와 화면에 찍을 이유를 돌려준다.
+
+    cli 엔진은 `claude -p` 를 부르므로 키 환경변수가 필요 없다. 키만 보면 Claude 구독
+    사용자는 engine 을 cli 로 바꿔도 영영 RULE 에 머물고, 가짜 키를 넣어야 LIVE 가 된다.
+    """
+    if cfg.get("engine") == "cli":
+        if shutil.which("claude"):
+            return True, "engine cli — claude CLI 감지됨"
+        return False, "engine cli — claude CLI 없음, 원문을 그대로 옮깁니다"
+    key_env = cfg.get("api_key_env", "OPENAI_API_KEY")
+    if os.environ.get(key_env):
+        return True, f"{key_env} 감지됨"
+    return False, f"{key_env} 없음 — 원문을 그대로 옮깁니다"
+
+
 def _strip_frontmatter(text: str) -> str:
     if text.startswith("---"):
         end = text.find("\n---", 3)
@@ -217,7 +233,8 @@ def _page_by_rule(raw_file: Path, text: str) -> tuple[Path, str]:
         "---\n\n"
         f"# {title}\n\n"
         "> 이 페이지는 **RULE 경로**로 만들어졌습니다. 원문을 그대로 옮겼고 요약·분류·\n"
-        "> 연결은 하지 않았습니다. `OPENAI_API_KEY` 를 설정하고 `compile.py --recompile`을 실행하면\n"
+        "> 연결은 하지 않았습니다. `OPENAI_API_KEY` 를 설정하거나(Claude Code 사용자는 `schema/config.yaml` 의\n"
+        "> engine 을 `cli` 로) `compile.py --recompile`을 실행하면\n"
         "> 같은 메모가 어떻게 정리되는지 비교해 볼 수 있습니다.\n\n"
         f"{body}\n"
     )
@@ -488,11 +505,11 @@ def main() -> int:
         print("  메모를 먼저 넣어 보세요: uv run python scripts/ingest.py --note \"오늘 배운 것\"")
         return 0
 
-    key_env = llm_client.load_llm_config().get("api_key_env", "OPENAI_API_KEY")
-    live = bool(os.environ.get(key_env)) and not args.rule
+    can_live, why = _live_check(llm_client.load_llm_config())
+    live = can_live and not args.rule
     print(f"[compile] 메모 {len(files)}건 → 위키 컴파일")
     print(f"  경로: {'LIVE' if live else 'RULE'} "
-          f"({'--rule 지정 — 모델 호출 없음' if args.rule else key_env + (' 감지됨' if live else ' 없음 — 원문을 그대로 옮깁니다')})")
+          f"({'--rule 지정 — 모델 호출 없음' if args.rule else why})")
 
     if args.dry_run:
         for f in files:

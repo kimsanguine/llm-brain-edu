@@ -148,7 +148,7 @@ def run_checks(root: Path = ROOT, *, fix: bool = False) -> list[dict]:
     if engine == "cli":
         has_claude = shutil.which("claude") is not None
         results.append(_r("claude-cli", "OK" if has_claude else "WARN",
-                          "" if has_claude else "claude CLI 없음 — cli 엔진(기본) 사용 시 필요"))
+                          "" if has_claude else "claude CLI 없음 — engine: cli 사용 시 필요"))
 
     return results
 

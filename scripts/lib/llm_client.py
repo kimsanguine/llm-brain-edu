@@ -1,8 +1,8 @@
 """llm_client — LLM 엔진 추상화 (SPEC "LLM 엔진 통합" 절의 예약 인터페이스 구현).
 
-`schema/config.yaml` 의 `llm.engine` 로 cli / api 를 분기한다.
+`schema/config.yaml` 의 `llm.engine` 로 openai / cli / api 를 분기한다(수업 설정 기본은 openai).
 
-- **cli** (기본): 기존 `claude -p` subprocess 로직을 재사용한다. API 키 불필요,
+- **cli** (config 가 없을 때의 코드 기본값): 기존 `claude -p` subprocess 로직을 재사용한다. API 키 불필요,
   Claude Code CLI 설치 필요. wiki_app 이 지금까지 써온 경로와 동일.
 - **api**: `anthropic` SDK 로 직접 호출한다. `anthropic` 은 함수 내부에서 지연 import
   하므로 cli 모드에는 패키지가 없어도 무방하다 (부재 시 api 모드만 친절한 에러).

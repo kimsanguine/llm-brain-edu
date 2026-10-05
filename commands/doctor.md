@@ -43,7 +43,7 @@ uv run python scripts/doctor.py $ARGUMENTS
 - **커맨드**: ingest·curate·express·query·okf·doctor·wikiweb
 - **설정**: `schema/config.yaml`(LLM 엔진)·`schema/sources.yaml`(소스 — gitignored, 없으면 WARN)
 - **의존성**: pyyaml·fastapi·uvicorn·httpx·python-frontmatter (`uv sync`로 설치)
-- **claude CLI**: cli 엔진(기본) 사용 시 필요 (없으면 WARN)
+- **claude CLI**: `engine: cli` 사용 시 필요 (없으면 WARN). 수업 기본 엔진은 `openai`
 
 ## 결과 해석
 

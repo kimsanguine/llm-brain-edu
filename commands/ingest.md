@@ -13,6 +13,8 @@ llm-brain의 ingest 커맨드입니다. 아래 절차를 순서대로 실행하�
 - `--note "<텍스트>"` 포함 → 노트 모드
 - `--resonance high|medium|low` 옵션이 있으면 해당 레벨 사용
 - `--priority-only` → resonance: high 미처리 파일만 처리
+- 그 밖에 존재하는 파일 경로(`~/…`, `./…`, `/…`) → 파일 모드(`--file <경로>`)
+- 그 밖의 텍스트 → 노트 모드(`--note "<텍스트>"`). 스크립트는 위치 인자를 받지 않는다
 - 인자 없음 → 미처리 파일 목록만 확인
 
 ## Step 1: 스크립트 실행
@@ -36,32 +38,32 @@ uv run python scripts/ingest.py [--priority-only]
 
 목록 모드: exit code 0 = 처리할 파일 없음, exit code 1 = 미처리 파일 있음. 저장 모드(`--url`·`--file`·`--note`)는 저장 성공 시 0.
 
-## Step 2: wiki 컴파일
+## Step 2: wiki 컴파일 (교육판: compile.py)
 
-스크립트 출력에서 미처리 파일 목록을 확인합니다.
-미처리 파일이 있으면 `schema/ingest.md` 규칙에 따라 각 파일을 wiki 페이지로 컴파일합니다:
+교육판에서는 **wiki 페이지를 직접 쓰지 않습니다.** 아래 명령 하나가 raw → wiki 정리, `index.md`,
+`wiki/graph.json`, 완료 표시까지 합니다. `schema/config.yaml`의 엔진으로 LIVE(키가 있거나
+`engine: cli`)인지 RULE인지 정하고 화면에 찍습니다.
 
-1. 각 raw 파일 내용 읽기
-2. `schema/domains.yaml` 기준 도메인 분류
-3. `index.md`에서 관련 기존 페이지 확인
-   - 기존 페이지 있음 → 갱신 (sources 추가, 내용 병합)
-   - 없음 → 신규 생성 (wiki frontmatter 포함)
-4. wikilink 교차 연결
-5. `index.md` 갱신
+그래프 delta를 보려면 컴파일 **전에** 스냅샷을 먼저 뜹니다(Step 4-0).
 
-## Step 3: 완료 표시
-
-wiki 컴파일 완료 후:
 ```bash
 cd "$(git rev-parse --show-toplevel)"  # llm-brain 레포 루트
-uv run python scripts/ingest.py --mark-done
+uv run python scripts/compile.py
 ```
+
+## Step 3: 근거 원장 갱신 (AI 답변·query 준비)
+
+```bash
+uv run python scripts/claims.py build
+```
+
+`claim ledger written`이 나오면 `/llm-brain:query`와 웹 AI 답변이 새 페이지를 근거로 쓸 수 있습니다.
 
 ## Step 4: 그래프 delta 처리
 
 > wiki 페이지가 0개이거나 Step 2에서 변경 사항이 없으면 이 단계를 건너뜁니다.
 
-**4-0. 스냅샷** (export_graph.py 실행 전 반드시 먼저):
+**4-0. 스냅샷** (Step 2 compile 실행 전 반드시 먼저):
 
 ```python
 import sys
@@ -70,12 +72,7 @@ from ingest import snapshot_graph
 snapshot_graph()  # wiki/graph.json → wiki/.graph_prev.json 복사
 ```
 
-**4-1. export_graph.py 실행** (graph.json 갱신):
-
-```bash
-cd "$(git rev-parse --show-toplevel)"  # llm-brain 레포 루트
-uv run python scripts/export_graph.py
-```
+**4-1.** graph.json 갱신은 Step 2의 compile.py가 이미 했습니다.
 
 **4-2. delta 계산 및 출력**:
 
@@ -107,6 +104,6 @@ Obsidian에서 `wiki/canvas/ingest-delta.canvas`를 열어 신규/갱신 노드�
 
 ## 가드레일 (절대 위반 금지)
 
-- `raw/` 파일 수정 금지 (읽기 전용)
+- `raw/`는 읽기 전용 (원문 수정은 사용자가 명시적으로 요청할 때만)
 - `raw/` 근거 없이 wiki 사실 수정 금지
 - Claude 학습 데이터만으로 wiki 작성 금지

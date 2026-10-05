@@ -1,19 +1,21 @@
 # llm-brain — Claude Code 선택 호환 지침
 
-수업의 표준 에이전트는 Codex이며, 공통 운영 규칙의 정본은 AGENTS.md다. Claude Code를 사용하는 경우에도 먼저 AGENTS.md를 읽고 동일한 가드레일을 따른다.
+수업의 표준 에이전트는 Codex이며, 공통 운영 규칙의 정본은 AGENTS.md다. Claude Code도 아래로 같은 규칙을 읽는다(Claude Code는 이 파일만 자동으로 읽으므로 import 로 함께 불러온다).
 
-이 파일과 commands/는 기존 Claude Code 사용자를 위한 선택 호환 경로다. Claude는 raw 소스를 읽어 wiki를 생성·갱신하고, 사용자 질문에는 wiki 기반으로만 답한다.
+@AGENTS.md
+
+이 파일과 commands/는 Claude Code 사용자를 위한 선택 호환 경로다. 교육판에서 raw → wiki 정리는 Claude가 페이지를 직접 쓰지 않고 `scripts/compile.py`가 한다. 사용자 질문에는 wiki 기반으로만 답한다.
 
 ## 가드레일 (절대 위반 금지)
 
 1. `raw/` 출처 없이 `wiki/` 신규 생성·사실 수정 금지
 2. query 응답 중 `wiki/` 편집 금지
 3. 학습 데이터만으로 `wiki/` 작성 금지 — 반드시 `raw/` 근거 필요
-4. `raw/` 파일 수정 금지 — 읽기 전용
+4. `raw/`는 읽기 전용 — 원문 수정은 사용자가 명시적으로 요청할 때만 한다(예: 메모 오타 정정, 개인정보 삭제). 그 뒤 `compile.py`로 위키를 갱신한다
 
 ### 프라이버시 경계 (Agent Memory OS)
 
-- `episodes/` — 운영 맥락을 담는 append-only 원장. 교육판의 신규 ingest 기록은 원문·원본 URL 대신 저장된 raw 경로만 남긴다. 다른 경로와 과거 기록에는 verbatim 내용이 남을 수 있다. **ingest·express·query·curate 4 경로가 자동 기록**(fail-soft). **gitignored** (스키마 예시 1개만 `examples/`에 커밋) — one-way door 누출 방지.
+- `episodes/` — 운영 맥락을 담는 append-only 원장. 교육판의 신규 ingest 기록은 원문·원본 URL 대신 저장된 raw 경로만 남긴다. 다른 경로와 과거 기록에는 verbatim 내용이 남을 수 있다. **ingest·express·curate 스크립트와 웹 AI 답변이 자동 기록**(fail-soft. Claude가 대화로 답하는 query는 기록하지 않는다). **gitignored** (스키마 예시 1개만 `examples/`에 커밋) — one-way door 누출 방지.
 - `index.md` — wiki 목차(gitignored `wiki/`의 파생물). `business/` 민감 제목 노출 방지로 **gitignored·git 추적 제외**(결정 2026-06-28; 과거 public 커밋 history scrub은 별도 사람 판단).
 - `procedures/` — git-tracked이되 **OKF export 제외**(`schema/okf_export.yaml`의 `exclude_paths`).
 - `wiki/memory_health_report.md` — okf `META_FILES`에 등재돼 공개 OKF 번들에서 봉인(미포함).
@@ -29,12 +31,14 @@
 "/ingest ~/path/to/file.pdf [--resonance high]"
 "/ingest '텍스트 내용' [--resonance medium]"
 ```
+터미널(플러그인 없이)에서는 형식이 다르다: `uv run python scripts/ingest.py --url <URL>` · `--file <경로>` · `--note "<텍스트>"`. 위치 인자(`ingest.py '텍스트'`)는 오류가 난다.
 `scripts/ingest.py` 실행 → `raw/` 에 원본 저장 (여기까지가 ingest 다)
 
 > ⚠️ **교육 배포판(llm-brain-edu)에서는 여기서 끊긴다.** `raw/` → `wiki/` 컴파일은
 > `scripts/compile.py` 를 **따로 실행**해야 한다. 상류 저장소는 Claude Code 슬래시 커맨드가
 > 그 일을 했지만, 교육판은 Claude Code 설치를 전제하지 않으므로 `compile.py` 로 분리했다.
-> 학생이 치는 명령은 `ingest.py` → `compile.py` 두 번이다.
+> 학생이 치는 명령은 `ingest.py` → `compile.py` 두 번이다. 플러그인 `/llm-brain:ingest`는 저장 뒤
+> `compile.py`와 `claims.py build`까지 이어서 실행한다(`commands/ingest.md`).
 > 에피소드 자동기록: raw 저장 직후 `episodes/YYYY-MM.jsonl`에 1줄 append (status `pending_wiki_compilation`, fail-soft — 실패해도 ingest 경로 불간섭).
 
 ### curate
@@ -91,7 +95,7 @@ wiki에 없으면: "raw 데이터가 필요합니다" 응답
 "express report '[주제]'"
 ```
 `scripts/express.py` 실행 → `express/{type}/YYYY-MM-DD-{slug}.md` 저장
-blog: `raw/blog/`에도 복사 (ingest 피드백 루프)
+blog: 본문을 쓴 뒤 `uv run python scripts/express.py publish express/blog/<파일>`로 `raw/blog/`에 복사 (ingest 피드백 루프. 빈 틀은 복사하지 않는다)
 > 에피소드 자동기록: 초안 저장 직후 `episodes/YYYY-MM.jsonl`에 append (status `draft_ready`, fail-soft).
 
 ### wiki-web (HTML 검색 페이지)
@@ -102,10 +106,10 @@ uv run python -m wiki_app
 로컬 HTML 검색·페이지뷰 인터페이스. CLI `/query`의 시각화 버전.
 
 - **검색 알고리즘**: 제목+desc+tags+page_title 점수 매칭 (B). 결과 < 3개 시 본문 grep 자동 확장 (C). 한국어/영문 모두 작동.
-- **AI 답변 토글**: `claude -p` CLI 연결. SSE endpoint는 citation 검증을 위해 bounded buffering 후 한 번에 내보내는 `verified-buffered`이며 UI도 이를 표시. usable trusted claim이 없으면 LLM/stream을 호출하지 않고 `status: abstained`, 출처 `[]`, 안전한 제외 사유 count와 다음 행동 하나를 반환. CLI 부재 시 usable claim이 있는 요청은 `status: unavailable` fallback.
+- **AI 답변 토글**: `schema/config.yaml`의 엔진으로 답한다(수업 기본 `openai`, OpenAI 키 없는 Claude 사용자는 `engine: cli` → `claude -p`). 답하기 전에 `uv run python scripts/claims.py build`로 근거 원장을 만든다. SSE endpoint는 citation 검증을 위해 bounded buffering 후 한 번에 내보내는 `verified-buffered`이며 UI도 이를 표시. usable trusted claim이 없으면 LLM/stream을 호출하지 않고 `status: abstained`, 출처 `[]`, 안전한 제외 사유 count와 다음 행동 하나를 반환. CLI 부재 시 usable claim이 있는 요청은 `status: unavailable` fallback.
 - **백엔드**: `wiki_app/` (FastAPI · uv) — 7 endpoints (`/api/dashboard`, `/api/index`, `/api/search`, `/api/page/{slug}`, `/api/page/{slug}/graph`, `/api/ai-answer`, `/api/ai-answer/stream`)
 - **프론트엔드**: `wiki_app/static/` (vanilla JS + Pretendard)
-- **테스트**: `tests/test_wiki_app_*.py` (8 modules, 108 tests) · 저장소 전체 681 tests
+- **테스트**: `tests/test_wiki_app_*.py` (8 modules) · 전체는 `uv run pytest` (수치는 문서에 적지 않는다 — 코드가 정본)
 - **운영 가드레일**: 검색·페이지뷰·AI query는 `raw/`·`wiki/`·`wiki_stats.json`·접근 lock을 변경하지 않음. 접근 기록은 명시적 `curate --record-access PAGE_SLUG`만 사용
 - **에피소드 자동기록**: AI 답변 1건마다 `episodes/YYYY-MM.jsonl`에 append (task_type `ai_answer`, fail-soft — `finally`에서 최종 status 기록, 응답 경로 절대 불간섭)
 - **설계 기준**: `SPEC.md`의 현재 계약을 따른다. 과거 계획 문서는 로컬 비공개 보관소에 있다.

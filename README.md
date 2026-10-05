@@ -98,7 +98,31 @@ Codex에 다음처럼 요청한다.
 
 > AGENTS.md를 읽고 따라 주세요. 이 저장소의 설치 상태를 점검하고, 내가 다음으로 실행할 명령과 성공 기준을 한 단계씩 안내해 주세요.
 
-Claude Code 플러그인과 `/llm-brain:...` 명령은 기존 사용자를 위한 선택 호환 경로로 유지한다.
+Claude Code 플러그인과 `/llm-brain:...` 명령은 선택 호환 경로다. 아래 절을 따른다.
+
+### Claude Code로 쓰기 (선택) *For Claude Code users*
+
+Codex 대신 Claude Code를 써도 된다. 위의 clone·`uv sync`까지는 같고, 그다음 둘 중 하나를 고른다.
+
+**A. 폴더를 열고 자연어로 (권장, 플러그인 불필요)**
+
+```bash
+cd llm-brain-edu
+claude
+```
+
+Claude Code는 `CLAUDE.md`(그 안의 `@AGENTS.md` 포함)를 자동으로 읽는다. "README_수강생용.md를 읽고 설치 점검부터 도와줘", "이 메모 넣어줘: …", "위키로 만들어줘", "○○에 대해 알려줘"처럼 요청하면 `ingest.py` → `compile.py` 순서로 처리하고 위키 근거로만 답한다. 명령 실행·`curl` 확인 때 허락을 물으면 내용을 보고 허용한다.
+
+**B. 플러그인 슬래시 명령(`/llm-brain:*`)**
+
+```bash
+claude plugin marketplace add kimsanguine/llm-brain-edu
+claude plugin install llm-brain@llm-brain-edu
+```
+
+슬래시 명령은 clone한 폴더의 `scripts/`를 실행한다. 그래서 위의 clone·`uv sync`를 먼저 하고, **그 폴더에서** `claude`를 연다. `/llm-brain:ingest "메모"`는 저장·위키 컴파일·근거 원장 갱신까지 한 번에 하고, 그 뒤 `/llm-brain:query "질문"`으로 묻는다.
+
+**OpenAI 키 없이 AI 정리(LIVE)·AI 답변 쓰기**: `schema/config.yaml`에서 `engine: cli`로 바꾸면 `claude -p`가 정리와 답변을 맡는다(Claude 구독 사용량에서 차감, 메모 내용이 Anthropic으로 전송된다). `uv run python scripts/compile.py --dry-run`이 `engine cli — claude CLI 감지됨`을 찍으면 준비된 것이다.
 
 ---
 
@@ -251,7 +275,7 @@ uv run python scripts/compile.py --rule
 /llm-brain:express report "경쟁사 현황"
 ```
 
-blog 출력은 `raw/blog/`에도 자동 복사 → 다음 ingest 사이클에 wiki로 피드백.
+blog 본문을 다 쓴 뒤 `uv run python scripts/express.py publish express/blog/<파일>`로 `raw/blog/`에 넣으면 다음 compile 때 wiki로 피드백된다(본문을 아직 안 쓴 틀은 넣지 않는다).
 
 ```
 wiki/ → express/blog/ → raw/blog/ → wiki/   ← 피드백 루프
@@ -439,7 +463,7 @@ llm:
 | 모드 | 비용 | 조건 |
 |---|---|---|
 | `openai` (수업 기본) | API 과금 | `OPENAI_API_KEY` 필요 |
-| `cli` (선택 호환) | 별도 CLI 사용 조건에 따름 | Claude Code 설치 필요 |
+| `cli` (Claude 사용자) | Claude 구독 사용량 | Claude Code 설치 필요, 키 불필요. `engine: cli`로 바꾸면 compile LIVE와 AI 답변이 `claude -p`로 동작 |
 | `api` (선택 호환) | API 과금 | `ANTHROPIC_API_KEY` 필요 |
 
 ---

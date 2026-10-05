@@ -47,6 +47,14 @@ uv run python scripts/express.py $ARGUMENTS
 - 섹션: 현황 / 주요 발견 / 시사점 / 권고사항
 - 길이: 1500자 이상
 
-## Step 3: 파일 경로 안내
+## Step 3: (blog만) 피드백 루프에 넣기
+
+본문을 다 쓴 blog 초안만 `raw/blog/`로 복사합니다. 빈 틀(합성 대기 중)은 스크립트가 거부합니다.
+
+```bash
+uv run python scripts/express.py publish express/blog/<파일>.md
+```
+
+## Step 4: 파일 경로 안내
 
 작성 완료 후 저장된 파일 경로를 사용자에게 알립니다.

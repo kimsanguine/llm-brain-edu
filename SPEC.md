@@ -479,7 +479,7 @@ slug 생성: 소문자·숫자·하이픈만 허용, 연속 하이픈 합치기,
 
 #### blog 피드백 루프 (raw/blog/ 복사)
 
-`cmd_blog()` 실행 시 `express/blog/` 저장 후 `raw/blog/`에도 동일 파일을 복사한다. 이로써 blog 초안이 다음 ingest 사이클에서 wiki로 재컴파일되는 피드백 루프가 형성된다.
+`cmd_blog()`는 `express/blog/`에 초안 틀만 저장한다. 본문을 쓴 뒤 `express.py publish <초안>`이 `raw/blog/`로 복사한다(본문이 아직 "합성 대기 중"이거나 CONTEXT 블록이 남아 있으면 거부, exit 1). 이로써 blog 초안이 다음 ingest 사이클에서 wiki로 재컴파일되는 피드백 루프가 형성된다.
 
 #### 재사용 메타 frontmatter (US-007)
 

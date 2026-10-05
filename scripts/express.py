@@ -242,12 +242,9 @@ sources:
 
     out_path = TYPE_DIR["blog"] / filename
     save_draft(out_path, draft)
-
-    # raw/blog/에도 복사 (ingest 피드백 루프)
-    RAW_BLOG_DIR.mkdir(parents=True, exist_ok=True)
-    raw_dst = RAW_BLOG_DIR / filename
-    shutil.copy2(out_path, raw_dst)
-    print(f"[express] 복사 (raw/blog/): {raw_dst.relative_to(WIKI_ROOT)}")
+    # raw/blog/ 복사(피드백 루프)는 여기서 하지 않는다. 지금 파일은 아직 빈 틀이라,
+    # 복사하면 다음 compile 이 "(블로그 제목 — Claude가 작성)" 페이지를 위키에 만든다.
+    # 본문을 쓴 뒤 `express.py publish <파일>` 로 복사한다.
 
     _record_express_episode(
         "express_blog", topic, {"topic": topic}, pages, out_path, "collect_related_pages"
@@ -376,6 +373,31 @@ sources:
     _print_synthesis_hint("report", topic, out_path, pages)
 
 
+PLACEHOLDER_MARKERS = ("합성 대기 중", "<!-- CONTEXT_START -->")
+
+
+def cmd_publish(draft: str) -> int:
+    """본문이 채워진 blog 초안만 raw/blog/ 로 복사한다(ingest 피드백 루프)."""
+    path = Path(draft).expanduser()
+    if not path.is_absolute():
+        path = (WIKI_ROOT / path) if (WIKI_ROOT / path).exists() else path.resolve()
+    blog_dir = TYPE_DIR["blog"].resolve()
+    if not path.is_file() or path.resolve().parent != blog_dir:
+        print(f"[express] publish 는 express/blog/ 안의 초안 파일만 받습니다: {draft}")
+        return 1
+    text = path.read_text(encoding="utf-8")
+    if any(m in text for m in PLACEHOLDER_MARKERS):
+        print("[express] 아직 본문을 쓰지 않은 초안이라 raw/blog/ 에 넣지 않았습니다.")
+        print("          '합성 대기 중' 줄과 CONTEXT 블록을 본문으로 바꾼 뒤 다시 실행하세요.")
+        return 1
+    RAW_BLOG_DIR.mkdir(parents=True, exist_ok=True)
+    raw_dst = RAW_BLOG_DIR / path.name
+    shutil.copy2(path, raw_dst)
+    print(f"[express] 복사 (raw/blog/): {raw_dst.relative_to(WIKI_ROOT)}")
+    print("  다음 compile 때 위키로 들어갑니다: uv run python scripts/compile.py")
+    return 0
+
+
 def _print_synthesis_hint(
     output_type: str,
     topic: str,
@@ -403,6 +425,8 @@ def _print_synthesis_hint(
         print("     - 독자: AI/기술 관심 한국어 독자")
         print("     - 길이: 800-1200자 내외")
         print("     - 구조: 도입 → 핵심 인사이트 2-3개 → 실천 제안 → 마무리")
+        print("  본문을 쓴 뒤 피드백 루프(raw/blog/)에 넣으려면:")
+        print(f"     uv run python scripts/express.py publish {out_path.relative_to(WIKI_ROOT)}")
     elif output_type == "lecture":
         print("     - 각 슬라이드: 제목 + 핵심 포인트 3개 이내")
         print("     - 마지막 슬라이드: Q&A 또는 실습 과제")
@@ -440,6 +464,10 @@ def main() -> None:
     p_report = sub.add_parser("report", help="심층 리포트")
     p_report.add_argument("topic", help="리포트 토픽")
 
+    # publish — 본문을 쓴 blog 초안을 raw/blog/ 로(피드백 루프)
+    p_publish = sub.add_parser("publish", help="본문을 쓴 blog 초안을 raw/blog/ 에 넣는다")
+    p_publish.add_argument("draft", help="express/blog/ 안의 초안 파일 경로")
+
     args = parser.parse_args()
 
     if args.cmd == "blog":
@@ -450,6 +478,8 @@ def main() -> None:
         cmd_summary(args.week, args.month)
     elif args.cmd == "report":
         cmd_report(args.topic)
+    elif args.cmd == "publish":
+        sys.exit(cmd_publish(args.draft))
     else:
         parser.print_help()
         sys.exit(1)

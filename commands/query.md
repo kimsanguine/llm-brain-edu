@@ -31,12 +31,12 @@ legacy 원장도 현재 wiki source inventory와 다시 대조합니다. 어떤 
 원장 전체를 거부하며 자동 migration/rewrite하지 않습니다.
 이 inventory 오류는 민감한 statement/raw 경로를 출력하지 않고 영향받은 page slug/count와
 정확한 복구 명령 `uv run python scripts/claims.py build`만 표시합니다.
-원장 생성·갱신은 query와 분리된 명시적 write action입니다:
+원장 생성·갱신은 query와 분리된 명시적 write action입니다. 원장이 없거나 오래돼 abstain하면
+사용자에게 아래 명령(전체 재생성)을 안내합니다. `/llm-brain:ingest`는 컴파일 뒤 이 명령을 이미 실행합니다.
+`--slug`를 붙이면 원장 전체가 그 페이지들로 교체되므로 일반 안내에는 쓰지 않습니다.
 
 ```bash
-uv run python scripts/claims.py build \
-  --wiki-root wiki --ledger claims.jsonl \
-  --slug <첫_slug> --slug <다음_slug>
+uv run python scripts/claims.py build
 ```
 
 자동 build는 여러 source의 statement 귀속을 추측하지 않습니다. 페이지 `sources`가
