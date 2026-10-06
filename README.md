@@ -74,7 +74,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 - `uv run ...` · `git clone ...` · `cp ...` 같은 명령 → **터미널**(명령줄, 곧 CLI)에 입력
   - 💡 터미널 여는 법: macOS는 `⌘+Space` → `Terminal` 검색 → 실행. (Windows는 `PowerShell`.)
 
-> 아래의 Claude 슬래시 명령 예시는 기존 플러그인 사용자를 위한 선택 호환 문서다. 수업에서는 같은 일을 Codex에 자연어로 요청하거나, 제시된 Python 명령을 터미널에서 실행한다.
+> 아래의 Claude 슬래시 명령 예시는 기존 플러그인 사용자를 위한 선택 호환 문서다. 수업에서는 같은 일을 Codex에 자연어로 요청하거나, 제시된 Python 명령을 터미널에서 실행한다. Codex에는 Claude 슬래시 명령과 같은 이름의 스킬이 `.agents/skills/` 에 들어 있어서, 브레인 폴더에서 Codex를 열면 `$llm-brain-ingest 메모`, `$llm-brain-curate`, `$llm-brain-express blog 주제`, `$llm-brain-query 질문`, `$llm-brain-doctor` 로 부를 수 있다(설치 불필요).
 
 ---
 
@@ -500,6 +500,7 @@ llm-brain/
 ```
 llm-brain/
 ├── AGENTS.md                  # Codex 기준 공통 운영 가이드
+├── .agents/skills/            # Codex 스킬 ($llm-brain-ingest 등, commands/ 와 같은 이름 7개)
 ├── .claude-plugin/            # 선택 호환 플러그인 manifest
 ├── commands/                  # 선택 호환 슬래시 커맨드
 ├── CLAUDE.md                  # Claude Code 선택 호환 지침

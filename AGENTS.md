@@ -34,4 +34,6 @@ Codex에 파일 작업을 요청할 때는 목표, 대상 파일 또는 폴더, 
 
 ## 선택 호환
 
+Codex 는 `.agents/skills/` 의 스킬(`$llm-brain-ingest`, `$llm-brain-curate`, `$llm-brain-express`, `$llm-brain-query`, `$llm-brain-doctor`, `$llm-brain-okf`, `$llm-brain-wikiweb`)을 브레인 폴더에서 열면 자동으로 인식한다. 각 스킬은 `commands/` 의 같은 이름 절차를 따르는 입구이고, 스킬 없이 자연어로 요청해도 같은 스크립트를 실행한다.
+
 Claude Code 플러그인과 commands/의 슬래시 명령은 기존 사용자를 위한 선택 호환 경로다. 수업 본문과 수강생 지원은 Codex 경로를 기준으로 한다. 다른 에이전트 도구도 이 파일의 가드레일과 같은 Python 실행 경로를 지킬 수 있지만, 수업의 공식 지원 범위는 Codex다.
