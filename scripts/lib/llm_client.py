@@ -272,9 +272,14 @@ async def _call_cli(prompt: str, *, timeout: int) -> str:
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
         )
-        stdout, _stderr = await asyncio.wait_for(
+        stdout, stderr = await asyncio.wait_for(
             proc.communicate(input=prompt.encode("utf-8")), timeout=timeout
         )
+        if proc.returncode not in (0, None):
+            # 로그인이 안 된 claude 는 "Not logged in" 을 표준출력에 쓰고 종료 코드 1 로 끝난다.
+            # 이를 답변으로 넘기면 "인용 거부"로 보여 진짜 원인(로그인)이 가려진다.
+            detail = (stdout or stderr).decode("utf-8", errors="replace").strip() or "(출력 없음)"
+            raise LLMError(f"claude CLI 가 실패했습니다(종료 코드 {proc.returncode}): {detail[:300]}")
     finally:
         await _terminate_proc(proc)
     return stdout.decode("utf-8", errors="replace").strip()

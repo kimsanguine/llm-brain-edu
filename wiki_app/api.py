@@ -546,6 +546,16 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
                 "answer": "",
                 "sources": [],
             }
+        except LLMError as e:
+            answer_status = "error"
+            return {
+                "status": "error",
+                "message": f"LLM 호출 중 오류: {e}",
+                "question": req.question,
+                "context_slugs": valid_slugs,
+                "answer": "",
+                "sources": [],
+            }
         except Exception as e:
             answer_status = "error"
             return {
