@@ -400,6 +400,10 @@ async function callAI(question, contextSlugs) {
           if (slugs.length) {
             details.push(`<strong>검증된 출처 wiki 페이지:</strong> ${slugs.map(s => `<a href="#page=${encodeURIComponent(s)}" onclick="document.getElementById('ai-modal').classList.add('hidden')"><code>${escapeHtml(s)}</code></a>`).join(", ")}`);
           }
+          const externalSlugs = ev.data.external_slugs || [];
+          if (externalSlugs.length) {
+            details.push(`<strong>외부에서 가져온 글(요약 재료, 검증 전):</strong> ${externalSlugs.map(s => `<a href="#page=${encodeURIComponent(s)}" onclick="document.getElementById('ai-modal').classList.add('hidden')"><code>${escapeHtml(s)}</code></a>`).join(", ")}`);
+          }
           const reasonCounts = ev.data.exclusion_reason_counts || {};
           const reasonEntries = Object.entries(reasonCounts);
           if (reasonEntries.length) {

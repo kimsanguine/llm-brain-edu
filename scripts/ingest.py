@@ -465,9 +465,9 @@ def scrape_url(url: str, resonance: str | None = None) -> Path:
         f"{resonance_line}---\n\n{md_content}\n"
     )
     print(f"  저장: {out_file.relative_to(WIKI_ROOT)}")
-    print("  ℹ️ 웹에서 가져온 글은 위키에서 읽고 검색할 수 있지만, AI 답변의 근거(인용)로는 쓰이지 않습니다.")
-    print("     외부 글 속에 숨은 지시문을 막기 위한 규칙입니다. 근거로 쓰려면 내용을 확인한 뒤")
-    print("     `uv run python scripts/ingest.py --note \"확인한 핵심 내용\"` 으로 옮겨 넣으세요.")
+    print("  ℹ️ 웹에서 가져온 글은 위키에서 읽고 검색하고 AI 답변이 요약할 수 있습니다. 다만 \"외부 글 요약\"이라는")
+    print("     고지가 붙고 확인된 사실의 근거로는 쓰이지 않습니다(글 속에 숨은 지시문은 따르지 않습니다).")
+    print("     사실의 근거로 쓰려면 내용을 확인한 뒤 `uv run python scripts/ingest.py --note \"확인한 핵심 내용\"` 으로 옮겨 넣으세요.")
     return out_file
 
 

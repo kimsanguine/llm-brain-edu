@@ -975,7 +975,10 @@ markdown 기본, `--json`은 동일 구조. <1s 목표(file-first, 임베딩 없
 - stale와 raw mutation은 각각 `stale`, `source_hash_mismatch`로 구분해 제외
 - 외부 capture statement는 single-line canonical JSON data로 격리하고 명령/인용 불허
 - LLM citation token: `[claim:slug-N]`; invalid/non-active claim 하나라도 있으면 답변 거부
-- usable trusted claim이 없으면 exact `관련 정보 없음`만 허용하고 API/SSE status를
+- 외부 capture(untrusted)는 요약 재료로 쓸 수 있다: 인용하면 답변 맨 앞에 고지문(`EXTERNAL_NOTICE`)이 붙고
+  `## 출처`에 "외부 수집 글"로 표시하며 응답에 `external_sources`(SSE meta는 `external_slugs`)를 담는다.
+  날짜·원본 해시 점검과 지시문 불복종은 그대로다.
+- usable trusted claim도 요약 가능한 외부 capture도 없으면 exact `관련 정보 없음`만 허용하고 API/SSE status를
   `abstained`로 구분. LLM/stream을 호출하지 않고 source 목록은 비우며 안전한 제외
   사유 count와 다음 행동 하나 제공. SSE sequence는 meta → exact abstention chunk 1개 → done
 - SSE meta는 `delivery_mode: verified-buffered`를 명시하고 UI도 "검증 후 일괄 표시"로

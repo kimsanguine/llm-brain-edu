@@ -153,3 +153,20 @@ def test_cli_engine_sends_a_multi_megabyte_prompt_without_oserror(tmp_path, monk
     out = asyncio.run(call_llm(prompt, config={"engine": "cli"}))
 
     assert out == str(len(prompt.encode("utf-8")))
+
+
+def test_external_article_asked_about_is_not_crowded_out_by_a_large_trusted_document(tmp_path):
+    """깨지면: 큰 PDF 와 같이 고른 상태에서 가져온 기사를 요약해 달라고 하면 기사 근거가 통째로 빠져
+    "영국 계획에 관한 근거가 없다"는 엉뚱한 답이 나온다(2026-10-06 실측)."""
+    project_root, claims = _big_project(tmp_path)
+    article = [
+        _claim(project_root, f"web-{i + 1}", f"영국 AI 기회 실행계획 핵심 제안 {i} 번째 항목", "raw/clippings/web.md", "untrusted")
+        for i in range(5)
+    ]
+    records = _records(claims + article)
+
+    selected = claim_ledger.select_claims_for_question(
+        records, "영국 AI 기회 실행계획 핵심 제안을 요약해 줘", project_root=project_root
+    )
+
+    assert {f"claim:web-{i + 1}" for i in range(5)} <= {r.claim_id for r in selected}

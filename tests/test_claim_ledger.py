@@ -528,6 +528,8 @@ def test_exclusion_reason_counts_are_safe_aggregates_only(tmp_path):
     assert summary == {
         "usable_count": 0,
         "usable_slugs": [],
+        "external_count": 1,                 # 날짜·해시 점검을 통과한 외부 수집 글은 요약 재료로 센다
+        "external_slugs": ["beta"],
         "exclusion_reason_counts": {
             "source_hash_mismatch": 1,
             "stale": 1,

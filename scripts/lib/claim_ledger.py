@@ -475,6 +475,10 @@ def claim_exclusion_reason(
     return None
 
 
+EXTERNAL_NOTICE = ("※ 외부에서 가져온 글을 요약한 내용입니다. 확인된 사실의 근거가 아니니 "
+                   "중요한 내용은 원문에서 확인하세요.")
+
+
 def abstention_next_action(exclusion_counts: Mapping[str, int]) -> dict[str, str]:
     """답변을 거부했을 때 사용자에게 줄 "다음 행동"을 사유에 맞게 고른다.
 
@@ -484,7 +488,7 @@ def abstention_next_action(exclusion_counts: Mapping[str, int]) -> dict[str, str
     """
     if exclusion_counts and set(exclusion_counts) == {"untrusted"}:
         return {
-            "message": ("외부에서 수집한 글(웹 기사 등)은 답변에 인용할 수 없습니다. "
+            "message": ("외부에서 수집한 글(웹 기사 등)은 확인된 사실의 근거로 인용할 수 없습니다. "
                         "내용을 직접 확인해 메모로 옮기면 인용할 수 있습니다:"),
             "command": 'uv run python scripts/ingest.py --note "확인한 핵심 내용"',
         }
@@ -500,6 +504,8 @@ def summarize_claim_provenance(
     """Return deterministic aggregate provenance without raw values or statements."""
     usable_count = 0
     usable_slugs: set[str] = set()
+    external_count = 0
+    external_slugs: set[str] = set()
     exclusion_counts: dict[str, int] = {}
     for record in records:
         reason = claim_exclusion_reason(record, project_root=project_root, now=now)
@@ -508,9 +514,14 @@ def summarize_claim_provenance(
             usable_slugs.add(claim_slug(record))
         else:
             exclusion_counts[reason] = exclusion_counts.get(reason, 0) + 1
+            if reason == "untrusted":      # 그 밖의 점검(날짜·원본 해시)은 통과한 외부 수집 글
+                external_count += 1
+                external_slugs.add(claim_slug(record))
     return {
         "usable_count": usable_count,
         "usable_slugs": sorted(usable_slugs),
+        "external_count": external_count,
+        "external_slugs": sorted(external_slugs),
         "exclusion_reason_counts": {
             reason: exclusion_counts[reason] for reason in sorted(exclusion_counts)
         },
@@ -542,21 +553,26 @@ def select_claims_for_question(
     """근거가 상한(max_bytes)을 넘으면 질문과 글자쌍이 많이 겹치는 근거부터 담는다.
 
     상한 안이면 그대로 돌려준다. 넘는 문서(예: 200쪽 PDF)를 통째로 보내면 모델 호출이
-    실패하거나 느려진다. 사용할 수 있는 trusted 근거를 먼저 담고, 외부 수집물은 남는
-    예산에만 담는다. 인용 검증은 호출부가 전체 원장으로 따로 하므로 여기서 줄여도 안전하다.
+    실패하거나 느려진다. 질문과 겹치는 순서로 담고, 점수가 같으면 확인된(trusted) 근거를
+    먼저 담는다. 외부 수집 글도 요약 재료이므로 질문과 맞으면 다른 문서의 큰 근거에 밀리지
+    않는다. 인용 검증은 호출부가 전체 원장으로 따로 하므로 여기서 줄여도 안전하다.
     """
     sizes = [len(_canonical_json(r.to_mapping()).encode("utf-8")) for r in records]
     if sum(sizes) <= max_bytes:
         return list(records)
     wanted = _char_bigrams(question)
-    ranked = sorted(
-        range(len(records)),
-        key=lambda i: (
-            0 if claim_exclusion_reason(records[i], project_root=project_root, now=now) is None else 1,
-            -len(wanted & _char_bigrams(records[i].statement)),
+    reasons = [claim_exclusion_reason(r, project_root=project_root, now=now) for r in records]
+
+    def rank(i: int) -> tuple[int, int, int, int]:
+        answerable = reasons[i] in (None, "untrusted")          # 근거 또는 요약 재료로 쓸 수 있는 글
+        return (
+            0 if answerable else 1,                              # 오래됐거나 원본이 바뀐 근거는 맨 뒤
+            -len(wanted & _char_bigrams(records[i].statement)),  # 질문과 많이 겹치는 순
+            0 if reasons[i] is None else 1,                      # 같은 점수면 확인된(trusted) 근거가 먼저
             i,
-        ),
-    )
+        )
+
+    ranked = sorted(range(len(records)), key=rank)
     chosen: list[int] = []
     used = 0
     for i in ranked:
@@ -609,8 +625,18 @@ def render_cited_answer(
     *,
     project_root: Path,
     now: date | datetime | None = None,
+    allow_external: bool = False,
 ) -> str:
-    """Reject the whole answer unless every citation is active, trusted, and source-current."""
+    """Reject the whole answer unless every citation is active, source-current, and trusted.
+
+    `allow_external=True` 이면 외부 수집 글(untrusted)도 인용할 수 있다. 다만 날짜·원본 해시 같은
+    다른 점검은 그대로 통과해야 하고, 외부 글을 인용한 답변에는 맨 앞에 고지문이 붙으며 출처 줄에
+    "외부 수집 글"로 표시한다. 즉 요약 재료로는 쓰되 확인된 사실의 근거로는 보이지 않게 한다.
+    """
+    def _usable(record: ClaimRecord) -> bool:
+        reason = claim_exclusion_reason(record, project_root=project_root, now=now)
+        return reason is None or (allow_external and reason == "untrusted")
+
     records_by_id = {record.claim_id: record for record in records}
     used_ids: list[str] = []
     for match in _ANY_CITATION_RE.finditer(answer):
@@ -621,17 +647,14 @@ def render_cited_answer(
         record = records_by_id.get(claim_id)
         if record is None:
             raise ClaimCitationError(f"{claim_id}: unknown_claim")
-        reason = claim_exclusion_reason(record, project_root=project_root, now=now)
-        if reason is not None:
+        if not _usable(record):
+            reason = claim_exclusion_reason(record, project_root=project_root, now=now)
             raise ClaimCitationError(f"{claim_id}: {reason}")
         if claim_id not in used_ids:
             used_ids.append(claim_id)
 
     cleaned = answer.strip()
-    has_usable_trusted_claim = any(
-        claim_exclusion_reason(record, project_root=project_root, now=now) is None
-        for record in records
-    )
+    has_usable_trusted_claim = any(_usable(record) for record in records)
     if not has_usable_trusted_claim:
         if not used_ids and cleaned == ABSTENTION_RESPONSE:
             return cleaned
@@ -641,12 +664,17 @@ def render_cited_answer(
         )
     if not used_ids:
         raise ClaimCitationError("answer requires at least one valid trusted citation")
-    lines = [cleaned, "", "## 출처"]
+    external_ids = {
+        claim_id for claim_id in used_ids
+        if claim_exclusion_reason(records_by_id[claim_id], project_root=project_root, now=now) == "untrusted"
+    }
+    lines = ([EXTERNAL_NOTICE, ""] if external_ids else []) + [cleaned, "", "## 출처"]
     for claim_id in used_ids:
         record = records_by_id[claim_id]
         location = record.locator or record.raw_path
+        kind = f"외부 수집 글 {record.kind}" if claim_id in external_ids else record.kind
         lines.append(
-            f"- [{claim_id}] {record.kind} · {location} · sha256:{record.raw_sha256} "
+            f"- [{claim_id}] {kind} · {location} · sha256:{record.raw_sha256} "
             f"· valid {record.valid_from}..{record.valid_until}"
         )
     return "\n".join(lines)

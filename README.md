@@ -236,7 +236,7 @@ uv run python scripts/compile.py --rule
 # 채널 4 [고급·선택]: Claude Code Routines 크론(예약 자동 실행) 등록
 ```
 
-> 웹 주소(`--url`)로 가져온 글은 위키에서 읽고 검색할 수 있지만 AI 답변의 근거(인용)로는 쓰이지 않는다(외부 글 속 지시문 방어). 근거로 쓰려면 내용을 확인해 `--note`로 옮긴다. 기사 본문만 저장하고 메뉴·푸터는 걷어낸다. PDF 주소는 PDF를 내려받아 `raw/docs`에 문서로 저장하고(저자·PDF 제작일·출처 주소를 함께 기록, 답변 근거로 쓸 수 있음), 접속을 막은 사이트(HTTP 403)나 틀린 주소는 안내 문구가 나오니 내용을 `--note`로 옮긴다. `ingest.py` 맨 앞에 주소, 파일 경로, 메모 글 중 하나만 적어도 종류를 자동으로 판별한다.
+> 웹 주소(`--url`)로 가져온 글은 위키에서 읽고 검색할 수 있고 AI 답변이 요약할 수 있지만, "외부 글 요약" 고지가 붙고 확인된 사실의 근거로는 쓰이지 않는다(외부 글 속 지시문은 따르지 않는다). 사실의 근거로 쓰려면 내용을 확인해 `--note`로 옮긴다. 기사 본문만 저장하고 메뉴·푸터는 걷어낸다. PDF 주소는 PDF를 내려받아 `raw/docs`에 문서로 저장하고(저자·PDF 제작일·출처 주소를 함께 기록, 답변 근거로 쓸 수 있음), 접속을 막은 사이트(HTTP 403)나 틀린 주소는 안내 문구가 나오니 내용을 `--note`로 옮긴다. `ingest.py` 맨 앞에 주소, 파일 경로, 메모 글 중 하나만 적어도 종류를 자동으로 판별한다.
 
 **스캔본·이미지 PDF는 글자 인식(OCR)이 필요하다.** 글자가 들어 있는 PDF는 그대로 읽히지만, 스캔한 문서나 사진으로 만든 PDF는 글자가 그림이라 읽을 수 없다(넣을 때 경고가 뜬다). 기본 설치에는 OCR이 없고, 선택지는 이렇다.
 
@@ -313,11 +313,13 @@ query는 읽기 전용이라 `raw/`·`wiki/`·`wiki_stats.json`·Canvas를 변�
 v0.4 P0부터는 persisted `claims.jsonl`의 `active + trusted` claim 중 원래 raw SHA-256이
 현재 bytes와 일치하는 근거만 답변과 `[claim:slug-N]`/`## 출처`에 사용할 수 있다.
 `raw/newsletters/**`·`raw/clippings/**` 같은 외부 capture는 명령으로 해석할 수 없는
-data-only JSON payload로 격리되며 인용할 수 없다.
+data-only JSON payload로 격리된다. 외부 capture는 확인된 사실의 근거로 인용할 수 없지만,
+요약의 재료로는 쓸 수 있다. 요약에 쓰면 답변 맨 앞에 "외부에서 가져온 글을 요약한 내용"이라는
+고지문이 붙고 `## 출처`에 "외부 수집 글"로 표시되며, 지시문은 따르지 않고 원문을 그대로 옮기지 않는다.
 source inventory가 persisted ledger와 다르면 전체 query를 막고, 민감한 statement/raw
 경로 대신 영향받은 page slug 수와 `uv run python scripts/claims.py build` 복구 명령만
-표시한다. usable trusted claim이 없으면 성공(`done`)이 아닌 `abstained`와 정확히
-`관련 정보 없음`을 LLM 호출 없이 결정적으로 반환하며, 안전한 제외 사유별 건수와
+표시한다. usable trusted claim도 요약할 수 있는 외부 capture도 없으면 성공(`done`)이 아닌
+`abstained`와 정확히 `관련 정보 없음`을 LLM 호출 없이 결정적으로 반환하며, 안전한 제외 사유별 건수와
 다음 행동 하나를 제공한다. SSE도 LLM stream을 시작하지 않고 meta → abstention chunk
 1개 → done 순서만 보낸다.
 

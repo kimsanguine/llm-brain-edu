@@ -113,7 +113,7 @@ def test_url_ingest_tells_the_user_the_article_cannot_be_cited(brain, monkeypatc
         200, text=NEWS_HTML, request=httpx.Request("GET", "https://news.example/a1")))
     ingest.scrape_url("https://news.example/a1")
     out = capsys.readouterr().out
-    assert "AI 답변의 근거(인용)로는 쓰이지 않습니다" in out
+    assert "확인된 사실의 근거로는 쓰이지 않습니다" in out
     assert "ingest.py --note" in out
 
 

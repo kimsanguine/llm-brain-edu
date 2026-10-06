@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import wiki_app.api as api_module
+from scripts.lib import claim_ledger as claim_ledger_module
 from wiki_app.api import create_app
 
 
@@ -1166,112 +1167,100 @@ def test_ai_answer_stream_buffers_then_renders_valid_citations(tmp_path, monkeyp
     assert "event: done" in body
 
 
-def test_ai_answer_returns_abstained_with_safe_exclusion_summary(tmp_path, monkeypatch):
+def test_ai_answer_summarizes_an_external_capture_and_labels_it(tmp_path, monkeypatch):
+    """외부에서 가져온 글만 있어도 요약 답변을 하되, 확인된 사실이 아니라는 고지와 출처 표시가 붙는다.
+
+    깨지면: 외부 웹 글 요약이 다시 "관련 정보 없음"으로 막히거나, 반대로 외부 글이 고지 없이
+    확인된 사실처럼 인용된다(정책 변경 2026-10-06: 읽고 요약은 허용, 재배포·사실 근거 삼기는 금지).
+    """
     _project_root, wiki_root = _make_stream_claim_project(tmp_path)
     local_client = TestClient(create_app(wiki_root=wiki_root))
     monkeypatch.setattr(api_module.llm_client, "load_llm_config", lambda: {"engine": "api"})
 
     async def fake_call(*args, **kwargs):
-        return "관련 정보 없음"
+        return "외부 글은 베타 캡처 내용을 다룹니다. [claim:beta-1]"
 
     monkeypatch.setattr(api_module.llm_client, "call_llm", fake_call)
     response = local_client.post(
         "/api/ai-answer",
-        json={"question": "외부 캡처 내용?", "context_slugs": ["beta"]},
+        json={"question": "외부 캡처 요약해 줘", "context_slugs": ["beta"]},
     )
 
     data = response.json()
-    assert data["status"] == "abstained"
-    assert data["answer"] == "관련 정보 없음"
-    assert data["sources"] == []
-    assert data["exclusion_reason_counts"] == {"untrusted": 1}
-    # 외부 수집물만 있어서 거부한 경우 `claims.py build` 를 권하면, 이미 실행한 사용자가 같은
-    # 결과로 되돌아온다(2026-10-06 e2e). 사유에 맞게 "메모로 옮기라"고 안내한다.
-    action = data["recommended_next_action"]
-    assert "외부에서 수집한 글" in action["message"]
-    assert action["command"].startswith("uv run python scripts/ingest.py --note")
-    assert "claims.py build" not in json.dumps(action)
-    assert "Beta external capture" not in json.dumps(data, ensure_ascii=False)
-    assert "raw/newsletters" not in json.dumps(data, ensure_ascii=False)
+    assert data["status"] == "done"
+    assert data["answer"].startswith(claim_ledger_module.EXTERNAL_NOTICE)
+    assert "외부 수집 글" in data["answer"]
+    assert data["sources"] == []                      # 확인된(trusted) 출처는 없다
+    assert data["external_sources"] == ["beta"]       # 외부 글은 따로 표시한다
 
 
-def test_ai_answer_zero_usable_claims_skips_llm_and_records_abstention(
-    tmp_path, monkeypatch
-):
+def test_ai_answer_without_any_claim_skips_llm_and_records_abstention(tmp_path, monkeypatch):
+    """근거로도 요약 재료로도 쓸 글이 하나도 없으면 모델을 부르지 않고 거절을 기록한다."""
     _project_root, wiki_root = _make_stream_claim_project(tmp_path)
     local_client = TestClient(create_app(wiki_root=wiki_root))
     monkeypatch.setattr(api_module.llm_client, "load_llm_config", lambda: {"engine": "api"})
     captured_episodes = []
     monkeypatch.setattr(
-        api_module.episode,
-        "append",
-        lambda record, **kwargs: captured_episodes.append(record),
+        api_module.episode, "append", lambda record, **kwargs: captured_episodes.append(record)
     )
 
     async def forbidden_llm_call(*args, **kwargs):
-        pytest.fail("zero-usable provenance must skip call_llm")
+        pytest.fail("answerable claim 이 없으면 call_llm 을 부르면 안 된다")
 
     monkeypatch.setattr(api_module.llm_client, "call_llm", forbidden_llm_call)
     response = local_client.post(
-        "/api/ai-answer",
-        json={"question": "외부 캡처 내용?", "context_slugs": ["beta"]},
+        "/api/ai-answer", json={"question": "아무 근거 없는 질문?", "context_slugs": []}
     )
 
     data = response.json()
     assert data["status"] == "abstained"
     assert data["answer"] == "관련 정보 없음"
     assert data["sources"] == []
-    assert data["exclusion_reason_counts"] == {"untrusted": 1}
-    # 외부 수집물만 있어서 거부한 경우 `claims.py build` 를 권하면, 이미 실행한 사용자가 같은
-    # 결과로 되돌아온다(2026-10-06 e2e). 사유에 맞게 "메모로 옮기라"고 안내한다.
-    action = data["recommended_next_action"]
-    assert "외부에서 수집한 글" in action["message"]
-    assert action["command"].startswith("uv run python scripts/ingest.py --note")
-    assert "claims.py build" not in json.dumps(action)
+    assert data["exclusion_reason_counts"] == {}
     assert len(captured_episodes) == 1
     assert captured_episodes[0]["outputs"] == {"answer_status": "abstained"}
     assert captured_episodes[0]["status"] == "abstained"
 
 
-def test_ai_answer_stream_abstention_matches_nonstream_contract(tmp_path, monkeypatch):
+
+
+
+def test_ai_answer_stream_summarizes_an_external_capture_with_notice(tmp_path, monkeypatch):
     _project_root, wiki_root = _make_stream_claim_project(tmp_path)
     local_client = TestClient(create_app(wiki_root=wiki_root))
     monkeypatch.setattr(api_module.llm_client, "load_llm_config", lambda: {"engine": "api"})
 
     async def fake_stream(*args, **kwargs):
-        yield "관련 정보 없음"
+        yield "외부 글 요약입니다. [claim:beta-1]"
 
     monkeypatch.setattr(api_module.llm_client, "stream_llm", fake_stream)
     with local_client.stream(
         "POST",
         "/api/ai-answer/stream",
-        json={"question": "외부 캡처 내용?", "context_slugs": ["beta"]},
+        json={"question": "외부 캡처 요약", "context_slugs": ["beta"]},
     ) as response:
         body = response.read().decode("utf-8")
 
     assert '"delivery_mode": "verified-buffered"' in body
     assert '"source_slugs": []' in body
-    assert '"exclusion_reason_counts": {"untrusted": 1}' in body
-    assert "외부에서 수집한 글" in body and "ingest.py --note" in body
-    assert "claims.py build" not in body
-    assert 'event: chunk\ndata: {"text": "관련 정보 없음"}' in body
-    assert 'event: done\ndata: {"status": "abstained"}' in body
-    assert "raw/newsletters" not in body
+    assert '"external_slugs": ["beta"]' in body
+    assert claim_ledger_module.EXTERNAL_NOTICE in body
+    assert 'event: done\ndata: {"status": "done"}' in body
 
 
-def test_ai_answer_stream_zero_usable_claims_skips_llm_stream(tmp_path, monkeypatch):
+def test_ai_answer_stream_without_any_claim_skips_llm_stream(tmp_path, monkeypatch):
     _project_root, wiki_root = _make_stream_claim_project(tmp_path)
     local_client = TestClient(create_app(wiki_root=wiki_root))
     monkeypatch.setattr(api_module.llm_client, "load_llm_config", lambda: {"engine": "api"})
 
     def forbidden_llm_stream(*args, **kwargs):
-        pytest.fail("zero-usable provenance must skip stream_llm")
+        pytest.fail("answerable claim 이 없으면 stream_llm 을 부르면 안 된다")
 
     monkeypatch.setattr(api_module.llm_client, "stream_llm", forbidden_llm_stream)
     with local_client.stream(
         "POST",
         "/api/ai-answer/stream",
-        json={"question": "외부 캡처 내용?", "context_slugs": ["beta"]},
+        json={"question": "근거 없는 질문", "context_slugs": []},
     ) as response:
         body = response.read().decode("utf-8")
 
@@ -1321,8 +1310,13 @@ def test_ai_ui_labels_verified_buffering_and_uses_only_source_slugs():
     assert "recommended_next_action" in script
 
 
-def test_ai_answer_stream_emits_no_unvalidated_untrusted_citation(tmp_path, monkeypatch):
-    _project_root, wiki_root = _make_stream_claim_project(tmp_path)
+def test_ai_answer_stream_rejects_an_external_citation_whose_source_changed(tmp_path, monkeypatch):
+    """외부 글 인용을 허용해도 원본이 바뀐 근거(해시 불일치)는 여전히 거부한다.
+
+    깨지면: 가져온 글을 고쳐 쓴 뒤에도 옛 요약이 검증 없이 나간다.
+    """
+    project_root, wiki_root = _make_stream_claim_project(tmp_path)
+    (project_root / "raw" / "newsletters" / "beta.md").write_text("바뀐 내용\n", encoding="utf-8")
     local_client = TestClient(create_app(wiki_root=wiki_root))
     monkeypatch.setattr(api_module.llm_client, "load_llm_config", lambda: {"engine": "api"})
 
@@ -1338,9 +1332,7 @@ def test_ai_answer_stream_emits_no_unvalidated_untrusted_citation(tmp_path, monk
     ) as response:
         body = response.read().decode("utf-8")
 
-    assert '"exclusion_reason_counts": {"untrusted": 1}' in body
-    assert 'event: chunk\ndata: {"text": "관련 정보 없음"}' in body
-    assert 'event: done\ndata: {"status": "abstained"}' in body
+    assert "event: error" in body or '"status": "abstained"' in body
     assert "Unsafe answer" not in body
 
 

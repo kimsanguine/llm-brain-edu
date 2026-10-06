@@ -34,8 +34,9 @@ writer는 모든 record를 먼저 검증한 뒤 같은 디렉터리의 임시 �
    heading을 escape한 deterministic single-line JSON data로만 격리하며 명령으로 해석하지 않는다.
 4. `stale`, `superseded`, `source_missing`, `source_hash_mismatch`는 statement 없이 서로
    다른 exclusion reason으로 표면화한다.
-5. 답변 인용 토큰은 `[claim:slug-N]` 형식이다. unknown/malformed/inactive/untrusted
-   citation 하나라도 있으면 답변 전체를 거부한다. usable trusted claim이 있으면 성공
+5. 답변 인용 토큰은 `[claim:slug-N]` 형식이다. unknown/malformed/inactive citation 하나라도
+   있으면 답변 전체를 거부한다. untrusted citation은 웹 화면 답변(`allow_external`)에서만 요약
+   재료로 허용하며, 그때 답변 맨 앞에 외부 글 요약 고지문이 붙고 출처 줄에 "외부 수집 글"로 표시한다. usable trusted claim이 있으면 성공
    답변은 최소 한 개를 인용해야 한다. 하나도 없을 때만 정확한 무인용 표준 응답
    `관련 정보 없음`을 허용한다.
 6. SSE는 기존 chunk/byte cap 안에서 전부 buffering한 뒤 같은 citation gate를 통과한
