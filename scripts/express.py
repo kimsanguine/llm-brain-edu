@@ -69,9 +69,16 @@ def find_wiki_file(slug: str) -> Path | None:
 
 
 def keyword_score(text: str, keywords: list[str]) -> int:
-    """텍스트에 키워드가 등장하는 횟수를 점수로 반환한다."""
+    """텍스트에 키워드가 단어 앞부분으로 등장하는 횟수를 점수로 반환한다.
+
+    한국어는 "소재를"처럼 단어 뒤에 조사가 붙으므로 앞부분이 맞으면 센다. 하지만 "김테스트"
+    안의 "테스트"처럼 다른 낱말의 뒷부분은 세지 않는다(주제와 무관한 페이지가 근거로 섞인다).
+    """
     text_lower = text.lower()
-    return sum(text_lower.count(kw.lower()) for kw in keywords)
+    return sum(
+        len(re.findall(r"(?<![0-9a-z\uac00-\ud7a3])" + re.escape(kw.lower()), text_lower))
+        for kw in keywords
+    )
 
 
 def collect_related_pages(topic: str, max_pages: int = 5) -> list[tuple[Path, str]]:

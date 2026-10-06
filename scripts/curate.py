@@ -1115,7 +1115,7 @@ def run_reweave(*, fix: bool = False, dry_run: bool = False,
     return {"fixed": fixed, "alerts": alerts, "weak": weak_entries,
             "expired": expired, "expiry_errors": expiry_errors,
             "weekly": weekly, "synthesis": synthesis_targets,
-            "shrink_warnings": shrink_warnings, "dry_run": dry_run}
+            "shrink_warnings": shrink_warnings, "dry_run": dry_run, "applied": applied}
 
 
 # ── Report ─────────────────────────────────────────────────────────────
@@ -1204,8 +1204,13 @@ def write_report(audit: dict, distilled: list, lifecycle: dict,
         r_expired = reweave.get("expired", [])
         r_errors = reweave.get("expiry_errors", [])
         lines.append("\n## Reweave")
-        lines.append(f"fixed: {len(r_fixed)} / alert: {len(r_alerts)} / expired: {len(r_expired)}")
-        lines.append(f"\n### 자동 보강 ({len(r_fixed)}개)")
+        if reweave.get("applied"):
+            lines.append(f"fixed: {len(r_fixed)} / alert: {len(r_alerts)} / expired: {len(r_expired)}")
+            lines.append(f"\n### 자동 보강 ({len(r_fixed)}개)")
+        else:
+            lines.append(f"fixable: {len(r_fixed)} / alert: {len(r_alerts)} / expired: {len(r_expired)}")
+            lines.append("> `--fix` 를 붙이지 않아 아무 페이지도 바꾸지 않았습니다. 아래는 고칠 수 있는 후보입니다.")
+            lines.append(f"\n### 보강 후보 ({len(r_fixed)}개, 적용 안 함)")
         for rel, actions in r_fixed:
             lines.append(f"- `{rel}` — {'; '.join(actions)}")
         lines.append(f"\n### Alert — 판단 필요분 ({len(r_alerts)}개)")
@@ -1267,11 +1272,22 @@ def write_report(audit: dict, distilled: list, lifecycle: dict,
     )
     if reweave is not None:
         log_entry += (
-            f"- reweave: fixed {len(reweave.get('fixed', []))} / "
+            f"- reweave: {'fixed' if reweave.get('applied') else 'fixable'} {len(reweave.get('fixed', []))} / "
             f"alert {len(reweave.get('alerts', []))} / "
             f"expired {len(reweave.get('expired', []))}\n"
         )
-    LOG_FILE.open("a").write(log_entry)
+    _append_log(log_entry)
+
+
+LOG_HEADER = "# LLM Wiki — 실행 로그\n\n> ingest / curate 실행 이력이 자동으로 기록된다. 직접 편집하지 않는다.\n\n---\n"
+
+
+def _append_log(entry: str) -> None:
+    """실행 이력을 log.md 에 덧붙인다. 이 파일은 git 이 추적하지 않는다(실행마다 바뀌어 git pull 을 막는다)."""
+    if not LOG_FILE.exists():
+        LOG_FILE.write_text(LOG_HEADER, encoding="utf-8")
+    with LOG_FILE.open("a", encoding="utf-8") as fh:
+        fh.write(entry)
 
 
 def _score_suffix(item: dict) -> str:

@@ -51,3 +51,6 @@ episodes/
 
 # 근거 원장 — 메모 문장 사본이 들어 있다(raw/·wiki/와 같은 개인 데이터)
 claims.jsonl
+
+# 실행 이력 — 실행마다 바뀌어 git pull 을 막는다(curate 가 처음 실행될 때 만든다)
+/log.md
