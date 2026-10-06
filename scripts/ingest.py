@@ -153,6 +153,29 @@ def pdf_title(path: Path) -> str | None:
     return title if usable(title) else None
 
 
+def pdf_metadata(path: Path) -> dict[str, str]:
+    """PDF 자체에 적힌 저자·제작 도구·출판 정보를 돌려준다. 비어 있는 항목은 뺀다."""
+    import pymupdf
+
+    try:
+        with pymupdf.open(str(path)) as doc:
+            meta = doc.metadata or {}
+            pages = doc.page_count
+    except Exception:
+        return {}
+    found: dict[str, str] = {}
+    for field in ("author", "creator", "producer", "subject", "keywords"):
+        value = " ".join((meta.get(field) or "").split())
+        if value:
+            found[field] = value
+    created = re.match(r"D:(\d{4})(\d{2})(\d{2})", meta.get("creationDate") or "")
+    if created:
+        found["pdf_created"] = "-".join(created.groups())
+    if pages:
+        found["pages"] = str(pages)
+    return found
+
+
 def extract_text(file: Path) -> str | None:
     """지원 형식에서 텍스트를 추출해 MD 문자열로 반환한다."""
     suffix = file.suffix.lower()
@@ -410,8 +433,8 @@ def _is_pdf_response(resp: httpx.Response) -> bool:
     return "application/pdf" in resp.headers.get("content-type", "").lower() or resp.content[:5] == b"%PDF-"
 
 
-def _pdf_url_to_markdown(url: str, resp: httpx.Response) -> tuple[str, str]:
-    """PDF 주소의 응답에서 (제목, 본문 글자)를 뽑는다. PDF 파일 자체는 저장하지 않는다."""
+def _save_pdf_from_url(url: str, resp: httpx.Response, resonance: str | None) -> Path:
+    """PDF 주소는 내려받아 --file 로 넣은 것과 똑같이 raw/docs 에 저장한다(저자·출처 주소 포함)."""
     import tempfile
     from urllib.parse import urlparse
 
@@ -419,13 +442,8 @@ def _pdf_url_to_markdown(url: str, resp: httpx.Response) -> tuple[str, str]:
     with tempfile.TemporaryDirectory() as tmp:
         pdf = Path(tmp) / (name if name.lower().endswith(".pdf") else f"{name}.pdf")
         pdf.write_bytes(resp.content)
-        text = extract_text(pdf)
-        title = pdf_title(pdf) or name
-    if not (text or "").strip():
-        print("  오류: 이 PDF에서 글자를 읽지 못했습니다(스캔본이거나 이미지로만 된 PDF일 수 있습니다).")
-        print("     PDF를 내려받아 `ingest.py --file` 로 넣거나, 내용을 `--note` 로 옮겨 넣으세요.")
-        sys.exit(1)
-    return title, text
+        print("  ℹ️ PDF 주소라서 내려받아 raw/docs 에 문서로 저장합니다(저자·출판 정보와 주소를 함께 기록).")
+        return ingest_file(pdf, resonance=resonance, source_url=url)
 
 
 def scrape_url(url: str, resonance: str | None = None) -> Path:
@@ -433,12 +451,9 @@ def scrape_url(url: str, resonance: str | None = None) -> Path:
     resp = _fetch_url(url)
 
     if _is_pdf_response(resp):
-        # PDF 주소를 웹 페이지처럼 읽으면 깨진 글자 파일이 저장된다. 글자만 뽑아 저장한다.
-        title, md_content = _pdf_url_to_markdown(url, resp)
-        print("  ℹ️ PDF 주소라서 글자만 뽑아 웹 스크랩으로 저장합니다. 신뢰하는 문서로 쓰려면")
-        print("     PDF를 내려받아 `uv run python scripts/ingest.py --file 파일.pdf` 로 넣으세요.")
-    else:
-        title, md_content = extract_article(resp.text)
+        # PDF 주소를 웹 페이지처럼 읽으면 깨진 글자 파일이 저장된다. PDF 로 저장한다.
+        return _save_pdf_from_url(url, resp, resonance)
+    title, md_content = extract_article(resp.text)
     if title and not md_content.startswith("# "):
         md_content = f"# {title}\n\n{md_content}"
     date_str = datetime.now().strftime("%Y-%m-%d")
@@ -456,8 +471,12 @@ def scrape_url(url: str, resonance: str | None = None) -> Path:
     return out_file
 
 
-def ingest_file(src: Path, resonance: str | None = None) -> Path:
-    """로컬 파일을 raw/docs/에 복사하고 텍스트 추출 MD를 함께 저장한다."""
+def ingest_file(src: Path, resonance: str | None = None, source_url: str | None = None) -> Path:
+    """로컬 파일을 raw/docs/에 복사하고 텍스트 추출 MD를 함께 저장한다.
+
+    PDF 는 파일 자체에 적힌 저자·출판 정보를, 웹 주소에서 내려받은 것이면 그 주소를
+    추출본 머리말에 함께 적는다(위키 페이지에 출처 정보로 이어진다).
+    """
     src = src.expanduser().resolve()
     if not src.exists():
         print(f"  오류: 파일을 찾을 수 없음 — {src}")
@@ -504,9 +523,16 @@ def ingest_file(src: Path, resonance: str | None = None) -> Path:
             resonance_line = f"resonance: {resonance}\n" if resonance else ""
             ocr_line = "ocr: tesseract\n" if used_ocr else ""
             md_out = docs_dir / f"{date_str}-{src.stem}.extracted.md"
+            meta_lines = ""
+            if source_url:
+                meta_lines += f"source_url: {_yaml_quote(source_url)}\n"
+            if is_pdf:
+                for field, value in pdf_metadata(src).items():
+                    plain = field in {"pdf_created", "pages"}
+                    meta_lines += f"{field}: {value}\n" if plain else f"{field}: {_yaml_quote(value)}\n"
             md_out.write_text(
                 f"---\ntitle: {src.name} 추출본\nsource_file: {src.name}\nextracted: {date_str}\n"
-                f"{ocr_line}{resonance_line}---\n\n{text}"
+                f"{meta_lines}{ocr_line}{resonance_line}---\n\n{text}"
             )
             print(f"  추출 MD: {md_out.relative_to(WIKI_ROOT)}")
             if used_ocr:
@@ -579,8 +605,35 @@ def mark_done() -> None:
     print(f"[ingest] {len(all_files)}개 파일 처리 완료로 표시.")
 
 
+_PATH_LIKE = re.compile(r"^(~|\.{1,2}[/\\]|/|[A-Za-z]:[/\\])")
+
+
+def classify_input(value: str) -> str:
+    """위치 인자 하나를 "url" · "file" · "note" 로 가른다.
+
+    http(s) 로 시작하면 주소, 실제로 있는 파일이면 파일, 그 밖은 메모다. 다만 파일 경로처럼 생겼는데
+    파일이 없으면 메모로 저장하지 않고 오류로 알린다(오타 낸 경로가 메모로 저장되는 것을 막는다).
+    """
+    text = value.strip()
+    if re.match(r"^https?://", text, flags=re.I):
+        return "url"
+    if os.path.isfile(os.path.expanduser(text)):
+        return "file"
+    looks_like_path = bool(_PATH_LIKE.match(text)) or (
+        not re.search(r"\s", text) and Path(text).suffix.lower() in SUPPORTED_EXTENSIONS
+    )
+    if looks_like_path:
+        print(f"  오류: 파일을 찾을 수 없음 — {text}")
+        print("     경로를 확인하세요. 이 글자 자체를 메모로 저장하려면 `--note \"...\"` 로 넣으세요.")
+        sys.exit(1)
+    return "note"
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="주소·파일·메모를 raw/ 에 넣는다. 맨 앞에 하나만 적으면 종류를 알아서 판별한다: "
+                    "ingest.py <웹 주소 | 파일 경로 | 메모 글>")
+    parser.add_argument("input", nargs="?", help="웹 주소, 파일 경로, 메모 글 중 하나(종류 자동 판별)")
     parser.add_argument("--url", help="스크랩할 URL")
     parser.add_argument("--file", help="raw/docs/에 추가할 로컬 파일 경로")
     parser.add_argument("--note", help="저장할 텍스트 노트")
@@ -602,6 +655,14 @@ def main() -> None:
         help="중복(hard dedup) 차단을 무시하고 저장 강행",
     )
     args = parser.parse_args()
+
+    if args.input is not None:
+        if args.url or args.file or args.note:
+            parser.error("맨 앞 입력과 --url/--file/--note 는 함께 쓸 수 없습니다. 하나만 쓰세요.")
+        kind = classify_input(args.input)
+        label = {"url": "웹 주소", "file": "파일", "note": "메모"}[kind]
+        print(f"  입력을 {label}로 인식했습니다.")
+        setattr(args, kind, args.input)
 
     if args.mark_done:
         mark_done()

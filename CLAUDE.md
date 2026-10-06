@@ -31,7 +31,7 @@
 "/ingest ~/path/to/file.pdf [--resonance high]"
 "/ingest '텍스트 내용' [--resonance medium]"
 ```
-터미널(플러그인 없이)에서는 형식이 다르다: `uv run python scripts/ingest.py --url <URL>` · `--file <경로>` · `--note "<텍스트>"`. 위치 인자(`ingest.py '텍스트'`)는 오류가 난다.
+터미널(플러그인 없이)에서는 형식이 다르다: `uv run python scripts/ingest.py --url <URL>` · `--file <경로>` · `--note "<텍스트>"`. 맨 앞에 하나만 적어도(`ingest.py <웹 주소 | 파일 경로 | 메모 글>`) 종류를 자동으로 판별한다. 파일 경로처럼 생겼는데 파일이 없으면 메모로 저장하지 않고 오류를 낸다.
 `scripts/ingest.py` 실행 → `raw/` 에 원본 저장 (여기까지가 ingest 다)
 
 > ⚠️ **교육 배포판(llm-brain-edu)에서는 여기서 끊긴다.** `raw/` → `wiki/` 컴파일은

@@ -327,40 +327,130 @@ def test_url_ingest_explains_connection_failures(brain, monkeypatch, capsys):
     assert "접속하지 못했습니다" in capsys.readouterr().out
 
 
-def test_pdf_address_saves_the_extracted_text_not_garbage(brain, tmp_path, monkeypatch, capsys):
-    """PDF 주소(arxiv.org/pdf/...)를 넣으면 글자만 뽑아 읽을 수 있는 웹 스크랩으로 저장한다.
+def _write_pdf_with_info(path: Path, *, author="Ashish Vaswani", created="D:20170612000000"):
+    _write_pdf(path, [(17, "Attention Is All You Need", "Abstract text of the paper goes here.")])
+    doc = pymupdf.open(str(path))
+    doc.set_metadata({"author": author, "creator": "LaTeX", "creationDate": created,
+                      "subject": "Neural Information Processing Systems"})
+    doc.saveIncr()
+    doc.close()
 
-    깨지면: PDF 바이트를 글자로 읽어 3MB 짜리 깨진 파일이 raw/clippings 에 생기고 위키·원장이 쓰레기로 찬다.
+
+def test_pdf_address_is_saved_as_a_trusted_document_with_author_and_source(brain, tmp_path, monkeypatch, capsys):
+    """PDF 주소는 --file 로 넣은 것과 같이 raw/docs 문서(신뢰 근거)로 저장하고, 저자·출판일·출처 주소를 남긴다.
+
+    깨지면: PDF 바이트를 글자로 읽어 3MB 짜리 깨진 파일이 생기거나, 논문의 저자·출처가 사라져
+    AI 답변이 "누가 쓴 어느 문서인지" 말하지 못한다.
     """
     pdf = tmp_path / "paper.pdf"
-    _write_pdf(pdf, [(17, "Attention Is All You Need", "Abstract text of the paper goes here.")])
+    _write_pdf_with_info(pdf)
     url = "https://arxiv.example/pdf/1706.03762"
     monkeypatch.setattr(ingest.httpx, "get", lambda *a, **k: _response(
         url, content=pdf.read_bytes(), content_type="application/pdf"))
 
     saved = ingest.scrape_url(url)
 
-    text = saved.read_text(encoding="utf-8")
-    assert saved.parent.name == "clippings"                  # 웹에서 가져온 글이라 근거 인용 불가 규칙을 그대로 따른다
-    assert 'title: "Attention Is All You Need"' in text
-    assert "Abstract text of the paper" in text
-    assert "%PDF" not in text and "endobj" not in text
-    assert not list((brain / "raw" / "docs").glob("*.pdf"))   # PDF 파일 자체는 저장하지 않는다
-    assert "ingest.py --file" in capsys.readouterr().out      # 신뢰 문서로 쓰는 길을 알려 준다
+    assert saved.parent.name == "docs" and saved.suffix == ".pdf"      # 신뢰 문서 위치
+    assert not claim_ledger._is_untrusted_source(saved.relative_to(brain).as_posix())
+    sidecar = next((brain / "raw" / "docs").glob("*.extracted.md")).read_text(encoding="utf-8")
+    assert "Abstract text of the paper" in sidecar and "%PDF" not in sidecar
+    assert 'author: "Ashish Vaswani"' in sidecar
+    assert "pdf_created: 2017-06-12" in sidecar
+    assert f'source_url: "{url}"' in sidecar
 
 
-def test_scanned_pdf_address_is_refused_with_a_reason(brain, tmp_path, monkeypatch, capsys):
-    """글자가 없는 스캔본 PDF 주소는 빈 파일을 저장하지 않고 이유와 대안을 말한다."""
+def test_wiki_page_carries_the_pdf_author_publication_date_and_source(brain, tmp_path, monkeypatch):
+    """위키 페이지 머리말에 저자·PDF 제작일·출처 주소가 이어진다.
+
+    깨지면: 추출본에는 적혀 있어도 위키 페이지에서 사라져 검색·답변·출처 표시에 쓸 수 없다.
+    """
+    pdf = tmp_path / "paper.pdf"
+    _write_pdf_with_info(pdf)
+    url = "https://arxiv.example/pdf/1706.03762"
+    monkeypatch.setattr(ingest.httpx, "get", lambda *a, **k: _response(
+        url, content=pdf.read_bytes(), content_type="application/pdf"))
+    ingest.scrape_url(url)
+
+    assert _compile(brain, monkeypatch) == 0
+
+    page = next((brain / "wiki" / "concepts").glob("*.md")).read_text(encoding="utf-8")
+    head = page.split("---", 2)[1]
+    assert 'author: "Ashish Vaswani"' in head
+    assert 'pdf_created: "2017-06-12"' in head
+    assert f'source_url: "{url}"' in head
+
+
+def test_local_pdf_also_records_author_and_publication_info(brain, tmp_path):
+    """직접 넣은 PDF(--file)에도 같은 정보가 남는다. PDF 주소와 파일로 넣는 경로가 갈라지지 않는다."""
+    pdf = tmp_path / "paper.pdf"
+    _write_pdf_with_info(pdf, author="김생근", created="D:20260901000000")
+    ingest.ingest_file(pdf)
+    sidecar = next((brain / "raw" / "docs").glob("*.extracted.md")).read_text(encoding="utf-8")
+    assert 'author: "김생근"' in sidecar and "pdf_created: 2026-09-01" in sidecar
+    assert "source_url" not in sidecar
+
+
+def test_scanned_pdf_address_is_saved_with_the_same_warning_as_a_local_scan(brain, tmp_path, monkeypatch, capsys):
+    """글자가 없는 스캔본 PDF 주소도 --file 과 똑같이 원본은 저장하고 이유와 대안을 말한다."""
     pdf = tmp_path / "scan.pdf"
     _write_scanned_pdf(pdf)
     url = "https://files.example/scan.pdf"
     monkeypatch.setattr(ingest.httpx, "get", lambda *a, **k: _response(
         url, content=pdf.read_bytes(), content_type="application/pdf"))
-    with pytest.raises(SystemExit) as exc:
-        ingest.scrape_url(url)
-    assert exc.value.code == 1
+    saved = ingest.scrape_url(url)
+    assert saved.suffix == ".pdf"
     assert "글자를 읽지 못했습니다" in capsys.readouterr().out
-    assert not (brain / "raw" / "clippings").exists() or not list((brain / "raw" / "clippings").glob("*.md"))
+
+
+# ── 위치 인자 자동 판별: ingest.py <주소 | 파일 | 메모> ─────────────────────────────
+
+
+def _run_ingest(monkeypatch, *argv):
+    monkeypatch.setattr(sys, "argv", ["ingest.py", *argv])
+    with pytest.raises(SystemExit) as exc:
+        ingest.main()
+    return exc.value.code
+
+
+def test_bare_argument_is_detected_as_a_web_address(brain, monkeypatch, capsys):
+    """주소를 그냥 적으면 웹 스크랩으로 처리된다(예전에는 위치 인자 자체가 오류였다)."""
+    monkeypatch.setattr(ingest.httpx, "get", lambda *a, **k: _response("https://news.example/a1", text=NEWS_HTML))
+    _run_ingest(monkeypatch, "https://news.example/a1")
+    assert "웹 주소로 인식" in capsys.readouterr().out
+    assert list((brain / "raw" / "clippings").glob("*.md"))
+
+
+def test_bare_argument_is_detected_as_a_file(brain, tmp_path, monkeypatch, capsys):
+    pdf = tmp_path / "paper.pdf"
+    _write_pdf_with_info(pdf)
+    _run_ingest(monkeypatch, str(pdf))
+    assert "파일로 인식" in capsys.readouterr().out
+    assert list((brain / "raw" / "docs").glob("*paper.pdf"))
+
+
+def test_bare_text_is_saved_as_a_note(brain, monkeypatch, capsys):
+    _run_ingest(monkeypatch, "회의 결정: 소재 A는 중단하고 B 예산을 늘린다")
+    assert "메모로 인식" in capsys.readouterr().out
+    notes = list((brain / "raw" / "notes").glob("*.md"))
+    assert len(notes) == 1 and "소재 A는 중단" in notes[0].read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("typo", ["~/Desktop/없는파일.pdf", "./missing-report.pdf", "report.docx", "C:\\Users\\x\\a.pdf"])
+def test_mistyped_file_path_is_an_error_not_a_note(brain, monkeypatch, capsys, typo):
+    """파일 경로처럼 생겼는데 파일이 없으면 메모로 저장하지 않는다.
+
+    깨지면: 경로를 오타 낸 사용자의 "~/Desktop/없는파일.pdf" 라는 글자가 메모로 저장돼 위키에 올라가고,
+    파일은 들어가지 않았는데도 성공한 것처럼 보인다.
+    """
+    assert _run_ingest(monkeypatch, typo) == 1
+    assert "파일을 찾을 수 없음" in capsys.readouterr().out
+    assert not list((brain / "raw" / "notes").glob("*.md"))
+
+
+def test_bare_argument_cannot_be_mixed_with_a_flag(brain, monkeypatch):
+    code = _run_ingest(monkeypatch, "메모 글", "--note", "다른 메모")
+    assert code == 2                                   # argparse 사용법 오류
+    assert not list((brain / "raw" / "notes").glob("*.md"))
 
 
 def test_extract_article_prefers_the_paper_title_and_drops_heading_anchors():

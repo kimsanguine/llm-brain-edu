@@ -200,6 +200,26 @@ def _with_scope(page: str, scope: str | None) -> str:
     return head + f"scope: {scope}\n" + page[end + 1:]
 
 
+def _raw_provenance(text: str) -> str:
+    """추출본 머리말의 저자·PDF 제작일·출처 주소를 위키 페이지 머리말 줄로 옮긴다(없으면 빈 문자열)."""
+    head = text.lstrip("\ufeff").lstrip()
+    m = re.match(r"^---\s*\n(.*?)\n---", head, flags=re.S)
+    if not m:
+        return ""
+    try:
+        meta = yaml.safe_load(m.group(1)) or {}
+    except yaml.YAMLError:
+        return ""
+    if not isinstance(meta, dict):
+        return ""
+    lines = ""
+    for key in ("author", "pdf_created", "source_url"):
+        value = meta.get(key)
+        if value:
+            lines += f"{key}: {_yaml_str(str(value))}\n"
+    return lines
+
+
 def _source_pdf_title(raw_file: Path) -> str | None:
     """PDF(또는 그 추출본)의 제목. 첫 줄이 저작권 안내인 논문도 제목을 바르게 잡는다."""
     if raw_file.suffix.lower() == ".pdf":
@@ -223,6 +243,7 @@ def _page_by_rule(raw_file: Path, text: str, title_hint: str | None = None) -> t
     rel_raw = raw_file.relative_to(ROOT).as_posix()
     tags = _raw_tags(text)
     tags_line = "tags: [" + ", ".join(_yaml_str(t) for t in tags) + "]\n"
+    provenance = _raw_provenance(text)
 
     # 본문이 이미 같은 제목으로 시작하면 한 번만 남긴다(제목이 두 번 찍히는 걸 막는다).
     if body.startswith("# "):
@@ -239,6 +260,7 @@ def _page_by_rule(raw_file: Path, text: str, title_hint: str | None = None) -> t
         f"updated: {today}\n"
         "sources:\n"
         f"  - {rel_raw}\n"
+        f"{provenance}"
         "distill_level: 0\n"
         "access_count: 0\n"
         "---\n\n"
