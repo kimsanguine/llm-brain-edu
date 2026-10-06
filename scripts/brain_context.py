@@ -137,7 +137,7 @@ def _index_scores(topic: str, wiki_root: Path) -> dict[str, int]:
         return {}
     keywords = _keywords(topic)
     scores: dict[str, int] = {}
-    for line in index_file.read_text(errors="replace").splitlines():
+    for line in index_file.read_text(errors="replace", encoding="utf-8").splitlines():
         m = _INDEX_LINE.search(line)
         if not m:
             continue

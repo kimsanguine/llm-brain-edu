@@ -18,10 +18,14 @@ _curate.write_stats_access(shared helper)로 통합해 한 곳에서만 관리�
 """
 from __future__ import annotations
 
-import fcntl
 import logging
 import os
 import sys
+
+try:
+    import fcntl
+except ImportError:          # 윈도우에는 fcntl 이 없다. 프로세스 사이 잠금만 건너뛰고 나머지는 그대로 동작한다.
+    fcntl = None
 import threading
 from pathlib import Path
 
@@ -91,13 +95,15 @@ class _cross_process_lock:
         # lockfile은 stats_file 디렉토리에 둔다. 그 디렉토리가 없으면 여기서 실패
         # → track이 로깅(best-effort)한다.
         self._fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
-        fcntl.flock(self._fd, fcntl.LOCK_EX)
+        if fcntl is not None:
+            fcntl.flock(self._fd, fcntl.LOCK_EX)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
         if self._fd is not None:
             try:
-                fcntl.flock(self._fd, fcntl.LOCK_UN)
+                if fcntl is not None:
+                    fcntl.flock(self._fd, fcntl.LOCK_UN)
             finally:
                 os.close(self._fd)
                 self._fd = None

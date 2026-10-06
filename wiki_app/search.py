@@ -56,7 +56,7 @@ class Index:
 
         root_resolved = wiki_root.resolve()
         current_cat = "concepts"
-        for line in index_path.read_text().splitlines():
+        for line in index_path.read_text(encoding="utf-8").splitlines():
             mcat = _INDEX_CAT_RE.match(line)
             if mcat:
                 current_cat = mcat.group(1)
@@ -115,7 +115,7 @@ class Index:
         # 3. graph.json에서 degree
         graph_path = wiki_root / "graph.json"
         if graph_path.exists():
-            graph = json.loads(graph_path.read_text())
+            graph = json.loads(graph_path.read_text(encoding="utf-8"))
             for n in graph["nodes"]:
                 if n.get("kind") == "page" and n["id"] in by_slug:
                     by_slug[n["id"]].degree = n.get("inbound", 0) + n.get("outbound", 0)
@@ -198,14 +198,14 @@ class Index:
                 continue
             if not md_path.exists():
                 continue
-            text = md_path.read_text().lower()
+            text = md_path.read_text(encoding="utf-8").lower()
             idx = text.find(q)
             if idx < 0:
                 continue
             # 80자 snippet 추출
             start = max(0, idx - 30)
             end = min(len(text), idx + 50)
-            snippet_raw = md_path.read_text()[start:end].replace("\n", " ")
+            snippet_raw = md_path.read_text(encoding="utf-8")[start:end].replace("\n", " ")
             out.append({
                 "slug": entry.slug,
                 "category": entry.category,

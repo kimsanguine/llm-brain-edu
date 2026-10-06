@@ -266,4 +266,4 @@ def save_canvas(canvas_data: dict, path: Path) -> None:
     """canvas_data를 Obsidian Canvas JSON 파일로 저장한다."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(canvas_data, ensure_ascii=False, indent=2))
+    path.write_text(json.dumps(canvas_data, ensure_ascii=False, indent=2), encoding="utf-8")

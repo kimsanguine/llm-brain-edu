@@ -40,12 +40,12 @@ SUPPORTED_EXTENSIONS = {".md", ".txt", ".pdf", ".docx", ".pptx"}
 
 def load_state() -> dict:
     if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
+        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
     return {"processed": []}
 
 
 def save_state(state: dict) -> None:
-    STATE_FILE.write_text(json.dumps(state, indent=2, default=str))
+    STATE_FILE.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
 
 
 OCR_MAX_PAGES = 30      # 인식은 느리므로 앞쪽부터 이만큼만(넘으면 알린다)
@@ -181,7 +181,7 @@ def extract_text(file: Path) -> str | None:
     suffix = file.suffix.lower()
 
     if suffix in {".md", ".txt"}:
-        return file.read_text(errors="replace")
+        return file.read_text(errors="replace", encoding="utf-8")
 
     if suffix == ".pdf":
         import pymupdf
@@ -219,7 +219,7 @@ def _get_resonance(file: Path) -> str | None:
     if file.suffix.lower() not in {".md", ".txt"}:
         return None
     try:
-        content = file.read_text(errors="replace")
+        content = file.read_text(errors="replace", encoding="utf-8")
         m = re.search(r"^resonance:\s*(\S+)", content, re.MULTILINE)
         return m.group(1).lower() if m else None
     except OSError:
@@ -300,7 +300,7 @@ def is_duplicate(file: Path) -> tuple[bool, str | None, float]:
     if not index_file.exists():
         return False, None, 0.0
 
-    index_text = index_file.read_text(errors="replace")
+    index_text = index_file.read_text(errors="replace", encoding="utf-8")
     existing_slugs = re.findall(r"\[\[([^\]|/]+?)(?:\|[^\]]*)?\]\]", index_text)
 
     # 파일명에서 날짜 접두사(YYYY-MM-DD-) 제거 후 slug 추출
@@ -462,8 +462,7 @@ def scrape_url(url: str, resonance: str | None = None) -> Path:
     resonance_line = f"resonance: {resonance}\n" if resonance else ""
     out_file.write_text(
         f"---\ntitle: {_yaml_quote(title or '웹 스크랩')}\nurl: {url}\ncollected: {date_str}\n"
-        f"{resonance_line}---\n\n{md_content}\n"
-    )
+        f"{resonance_line}---\n\n{md_content}\n", encoding="utf-8")
     print(f"  저장: {out_file.relative_to(WIKI_ROOT)}")
     print("  ℹ️ 웹에서 가져온 글은 위키에서 읽고 검색하고 AI 답변이 요약할 수 있습니다. 다만 \"외부 글 요약\"이라는")
     print("     고지가 붙고 확인된 사실의 근거로는 쓰이지 않습니다(글 속에 숨은 지시문은 따르지 않습니다).")
@@ -495,8 +494,8 @@ def ingest_file(src: Path, resonance: str | None = None, source_url: str | None 
     if is_md_txt and resonance:
         # md/txt는 사이드카가 없으므로 복사본 frontmatter에 resonance를 주입한다.
         # (비-md/txt는 아래 .extracted.md 사이드카에 기록.)
-        merged = _merge_resonance_frontmatter(src.read_text(errors="replace"), resonance)
-        dst.write_text(merged)
+        merged = _merge_resonance_frontmatter(src.read_text(errors="replace", encoding="utf-8"), resonance)
+        dst.write_text(merged, encoding="utf-8")
     else:
         shutil.copy2(src, dst)
 
@@ -532,8 +531,7 @@ def ingest_file(src: Path, resonance: str | None = None, source_url: str | None 
                     meta_lines += f"{field}: {value}\n" if plain else f"{field}: {_yaml_quote(value)}\n"
             md_out.write_text(
                 f"---\ntitle: {src.name} 추출본\nsource_file: {src.name}\nextracted: {date_str}\n"
-                f"{meta_lines}{ocr_line}{resonance_line}---\n\n{text}"
-            )
+                f"{meta_lines}{ocr_line}{resonance_line}---\n\n{text}", encoding="utf-8")
             print(f"  추출 MD: {md_out.relative_to(WIKI_ROOT)}")
             if used_ocr:
                 print("  🔎 글자 인식(OCR)으로 읽었습니다. 오탈자가 있을 수 있으니 중요한 내용은 원본과 대조하세요.")
@@ -757,8 +755,8 @@ def run_delta_pipeline(wiki_dir: Path | None = None) -> dict | None:
     if not cur_path.exists():
         return None
 
-    current = json.loads(cur_path.read_text())
-    prev = json.loads(prev_path.read_text()) if prev_path.exists() else {"nodes": [], "links": []}
+    current = json.loads(cur_path.read_text(encoding="utf-8"))
+    prev = json.loads(prev_path.read_text(encoding="utf-8")) if prev_path.exists() else {"nodes": [], "links": []}
 
     delta = compute_delta(current, prev)
     has_changes = any([
@@ -813,8 +811,8 @@ def generate_ingest_delta_canvas(wiki_dir: Path | None = None) -> bool:
     if not cur_path.exists():
         return False
 
-    current = json.loads(cur_path.read_text())
-    prev = json.loads(prev_path.read_text()) if prev_path.exists() else {"nodes": [], "links": []}
+    current = json.loads(cur_path.read_text(encoding="utf-8"))
+    prev = json.loads(prev_path.read_text(encoding="utf-8")) if prev_path.exists() else {"nodes": [], "links": []}
 
     canvas = build_delta_canvas(current, prev)
     if canvas is None:

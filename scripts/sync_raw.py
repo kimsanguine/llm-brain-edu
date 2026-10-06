@@ -19,12 +19,12 @@ STATE_FILE = WIKI_ROOT / ".sync_state.json"
 
 def load_state() -> dict:
     if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
+        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
     return {}
 
 
 def save_state(state: dict) -> None:
-    STATE_FILE.write_text(json.dumps(state, indent=2, default=str))
+    STATE_FILE.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
 
 
 def should_exclude(file: Path, exclude_tags: list[str]) -> bool:
@@ -257,7 +257,7 @@ def sync_git_repo(repo_cfg: dict) -> tuple[int, int]:
 
 
 def main() -> None:
-    config = yaml.safe_load(SOURCES_FILE.read_text())
+    config = yaml.safe_load(SOURCES_FILE.read_text(encoding="utf-8"))
     state = load_state()
 
     print(f"[sync_raw] {datetime.now().strftime('%Y-%m-%d %H:%M')}")

@@ -52,7 +52,7 @@ def today_str() -> str:
 def load_index() -> str:
     if not INDEX_FILE.exists():
         return ""
-    return INDEX_FILE.read_text(errors="replace")
+    return INDEX_FILE.read_text(errors="replace", encoding="utf-8")
 
 
 def extract_wikilinks(text: str) -> list[str]:
@@ -110,7 +110,7 @@ def collect_related_pages(topic: str, max_pages: int = 5) -> list[tuple[Path, st
     for _, slug, _ in top:
         path = find_wiki_file(slug)
         if path and path.exists():
-            results.append((path, path.read_text(errors="replace")))
+            results.append((path, path.read_text(errors="replace", encoding="utf-8")))
 
     return results
 
@@ -130,7 +130,7 @@ def collect_recent_pages(days: int) -> list[tuple[Path, str]]:
         if not d.exists():
             continue
         for f in sorted(d.glob("*.md")):
-            content = f.read_text(errors="replace")
+            content = f.read_text(errors="replace", encoding="utf-8")
             # frontmatter updated 우선, 없으면 mtime
             m = date_pattern.search(content)
             if m:
@@ -160,7 +160,7 @@ def build_context_block(pages: list[tuple[Path, str]]) -> str:
 
 def save_draft(output_path: Path, content: str) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(content)
+    output_path.write_text(content, encoding="utf-8")
     print(f"[express] 저장: {output_path.relative_to(WIKI_ROOT)}")
 
 

@@ -40,7 +40,7 @@ def _load_graph(wiki_root: Path) -> dict:
     graph_path = wiki_root / "graph.json"
     if not graph_path.exists():
         return {}
-    graph = json.loads(graph_path.read_text())
+    graph = json.loads(graph_path.read_text(encoding="utf-8"))
     return {n["id"]: n for n in graph["nodes"] if n.get("kind") == "page"}
 
 

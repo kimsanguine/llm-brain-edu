@@ -393,7 +393,7 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
         graph_path = wiki_root / "graph.json"
         if not graph_path.exists():
             raise HTTPException(status_code=503, detail="graph.json 없음 — export_graph 먼저")
-        g = _json.loads(graph_path.read_text())
+        g = _json.loads(graph_path.read_text(encoding="utf-8"))
         pages_map = {n["id"]: n for n in g["nodes"] if n["kind"] == "page"}
         if slug not in pages_map:
             raise HTTPException(status_code=404, detail=f"page not found: {slug}")
@@ -733,7 +733,7 @@ def _count_links(wiki_root: Path) -> int:
     graph_path = wiki_root / "graph.json"
     if not graph_path.exists():
         return 0
-    return len(json.loads(graph_path.read_text()).get("links", []))
+    return len(json.loads(graph_path.read_text(encoding="utf-8")).get("links", []))
 
 
 def _sanitize_frontmatter(fm: dict) -> dict:

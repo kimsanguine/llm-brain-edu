@@ -11,7 +11,6 @@ curate.py — wiki 감사(audit) + 압축(distill) + 수명 관리(lifecycle) + 
   python scripts/curate.py --reweave [--fix] [--dry-run] [--weekly-summary]
 """
 import argparse
-import fcntl
 import json
 import logging
 import math
@@ -22,6 +21,11 @@ import tempfile
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:          # 윈도우에는 fcntl 이 없다. 프로세스 사이 잠금만 건너뛰고 나머지는 그대로 동작한다.
+    fcntl = None
 
 import yaml
 
@@ -112,7 +116,7 @@ def stats_lock_path(stats_file: Path) -> Path:
 def load_wiki_stats() -> dict:
     """wiki_stats.json 로드. 없으면 빈 dict 반환."""
     if WIKI_STATS_FILE.exists():
-        return json.loads(WIKI_STATS_FILE.read_text())
+        return json.loads(WIKI_STATS_FILE.read_text(encoding="utf-8"))
     return {}
 
 
@@ -170,10 +174,12 @@ def update_stats_access(slug: str, stats_file: Path) -> int:
     lock_path = stats_lock_path(stats_file)
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        if fcntl is not None:
+            fcntl.flock(fd, fcntl.LOCK_EX)
         return write_stats_access(slug, stats_file)
     finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        if fcntl is not None:
+            fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
 
 
@@ -253,7 +259,7 @@ def ensure_distill_fields(page: Path) -> dict | None:
     이는 fail-loud로 보호한 페이지를 다시 Claude distill 대상으로 만들어 데이터
     손실 경로를 재개방한다. parse 실패 페이지는 후보 산정에서 완전히 제외해야 한다.
     """
-    content = page.read_text()
+    content = page.read_text(encoding="utf-8")
     try:
         fm, body = parse_frontmatter(content)
     except FrontmatterParseError as exc:
@@ -273,7 +279,7 @@ def ensure_distill_fields(page: Path) -> dict | None:
             fm[field] = default
             changed = True
     if changed:
-        page.write_text(serialize_frontmatter(fm, body))
+        page.write_text(serialize_frontmatter(fm, body), encoding="utf-8")
     return fm
 
 
@@ -349,7 +355,7 @@ def build_link_graph(pages: list[Path]) -> tuple[dict, dict]:
 
     for page in pages:
         name = page.stem
-        links = extract_wikilinks(page.read_text())
+        links = extract_wikilinks(page.read_text(encoding="utf-8"))
         valid = links & page_names
         outbound[name] = valid
         for target in valid:
@@ -426,7 +432,7 @@ def _write_contradiction_queue(candidates: list, now: datetime) -> None:
         )
         lines.append(f'      기존 주장: "{c.existing_claim}"')
         lines.append(f'      신규 근거: "{c.new_claim}"')
-    (WIKI_DIR / CONTRADICTION_QUEUE_NAME).write_text("\n".join(lines))
+    (WIKI_DIR / CONTRADICTION_QUEUE_NAME).write_text("\n".join(lines), encoding="utf-8")
 
 
 def run_audit(pages: list[Path]) -> dict:
@@ -451,7 +457,7 @@ def run_audit(pages: list[Path]) -> dict:
     # Stale link 탐지
     page_names = {p.stem for p in pages}
     for page in pages:
-        content = page.read_text()
+        content = page.read_text(encoding="utf-8")
         links = extract_wikilinks(content)
         missing = links - page_names
         for m in missing:
@@ -669,7 +675,7 @@ def run_distill(pages: list[Path]) -> list[str]:
             f"age={e['age_days']}일, access=0"
         )
 
-    DISTILL_QUEUE_FILE.write_text("\n".join(lines))
+    DISTILL_QUEUE_FILE.write_text("\n".join(lines), encoding="utf-8")
     total = len(urgent) + len(priority)
     print(f"  [distill] 긴급={len(urgent)}, 우선={len(priority)}, lifecycle={len(lifecycle_via_distill)} → wiki/distill_queue.md 저장")
 
@@ -691,7 +697,7 @@ def _load_sources_config() -> dict:
         else:
             print("  [lifecycle] sources.yaml/sources.example.yaml 모두 없음 — lifecycle 건너뜀")
             return {}
-    return yaml.safe_load(sources_file.read_text()) or {}
+    return yaml.safe_load(sources_file.read_text(encoding="utf-8")) or {}
 
 
 def run_lifecycle(pages: list[Path]) -> dict:
@@ -901,7 +907,7 @@ def _write_reweave_queue(queue_path: Path, weak_entries: list[tuple[str, list[st
         lines.append(
             f"- [ ] [[{t.slug}]] — {t.reason} · 반복신호 {t.signal_count} · 소스 {crossing}"
         )
-    queue_path.write_text("\n".join(lines))
+    queue_path.write_text("\n".join(lines), encoding="utf-8")
 
 
 # ── synthesis shrink 스냅샷 (WS-1 shrink 가드 (a) 변형 — 대상 한정) ────────
@@ -930,7 +936,7 @@ def _load_synthesis_snapshot() -> dict:
 def _save_synthesis_snapshot(snapshot: dict) -> None:
     """현재 synthesis 대상 스냅샷을 결정적 바이트로 저장(동일 입력 → 동일 파일)."""
     (WIKI_DIR / SYNTHESIS_SNAPSHOT_NAME).write_text(
-        json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True))
+        json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def _fm_sources_list(fm) -> list:
@@ -1258,7 +1264,7 @@ def write_report(audit: dict, distilled: list, lifecycle: dict,
             for ref, cnt in cands:
                 lines.append(f"- `{ref}` — {cnt}회")
 
-    REPORT_FILE.write_text("\n".join(lines))
+    REPORT_FILE.write_text("\n".join(lines), encoding="utf-8")
     print(f"\n[curate] 리포트 저장: wiki/curate_report.md")
 
     log_entry = (
@@ -1317,7 +1323,7 @@ def graph_health() -> None:
         print("[health] graph.json 없음 — export_graph 먼저 실행")
         return
 
-    g = json.loads(graph_path.read_text())
+    g = json.loads(graph_path.read_text(encoding="utf-8"))
     pages = {n["id"]: n for n in g["nodes"] if n["kind"] == "page"}
     ghosts = [n for n in g["nodes"] if n["kind"] == "ghost"]
 
@@ -1400,7 +1406,7 @@ def suggest_bridges(n: int) -> None:
         print("[suggest-bridges] graph.json 없음 — export_graph 먼저 실행")
         return
 
-    g = json.loads(graph_path.read_text())
+    g = json.loads(graph_path.read_text(encoding="utf-8"))
     pages = {n["id"]: n for n in g["nodes"] if n["kind"] == "page"}
 
     G = nx.Graph()
@@ -1478,7 +1484,7 @@ def do_purge() -> None:
     if not REPORT_FILE.exists():
         print("[purge] curate_report.md 없음. curate --lifecycle 먼저 실행.")
         return
-    content = _lifecycle_section(REPORT_FILE.read_text())
+    content = _lifecycle_section(REPORT_FILE.read_text(encoding="utf-8"))
     archive_dir = WIKI_DIR / "archive"
     archive_dir.mkdir(exist_ok=True)
     moved = 0
