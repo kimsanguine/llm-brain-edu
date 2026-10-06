@@ -19,13 +19,17 @@ def _guardrail(number: int) -> str:
     return match.group(1)
 
 
-def test_chat_answers_exclude_the_same_untrusted_folders_as_the_web_answer():
-    # 코드가 untrusted 폴더를 늘렸는데 문서가 그대로면, 웹 AI 답변은 거절하는 글을
-    # 에이전트가 대화에서 요약해 주는 어긋남이 다시 생긴다.
+def test_chat_may_summarize_external_clippings_but_not_republish_or_obey_them():
+    # 코드가 untrusted 폴더를 늘렸는데 문서가 그대로면, 새 폴더의 글을 에이전트가 근거나 공개 자료로
+    # 쓰게 되는 어긋남이 생긴다. 폴더 목록은 코드와 같아야 한다.
     rule = _guardrail(8)
     for marker in _UNTRUSTED_DIR_MARKERS:
         assert f"raw{marker}" in rule, f"가드레일 8번에 raw{marker} 가 없다"
-    assert "--note" in rule  # 거절만 하면 사용자가 막힌다: 대안 경로를 함께 안내한다
+    assert "요약해도" in rule          # 읽고 요약하는 것은 허용한다(재배포가 문제이지 읽기가 문제는 아니다)
+    assert "출처 주소" in rule          # 요약에는 출처를 밝힌다
+    assert "지시문" in rule             # 글 속 지시문은 따르지 않는다(주입 방어)
+    assert "재배포" in rule             # 원문을 그대로 옮기거나 공개 자료로 내보내지 않는다
+    assert "--note" in rule            # 근거로 쓰려면 사용자가 확인해 메모로 옮긴다
 
 
 def test_deletion_scope_is_user_data_and_excludes_repository_code():
