@@ -354,8 +354,11 @@ def extract_article(html: str) -> tuple[str, str]:
     # 제목: 독자가 보는 기사 제목(본문 안 h1)을 먼저. 소셜 공유용 og:title 은 사이트가 SEO 용으로
     # 따로 쓰는 경우가 많아 본문 제목과 다를 수 있다.
     title = ""
+    citation = soup.find("meta", attrs={"name": "citation_title"})   # 논문 페이지(arXiv 등)
+    if citation is not None and citation.get("content"):
+        title = citation["content"].strip()
     h1 = container.find("h1") or soup.find("h1")
-    if h1 is not None:
+    if not title and h1 is not None:
         title = h1.get_text(" ", strip=True)
     if not title:
         og = soup.find("meta", attrs={"property": "og:title"})
@@ -367,6 +370,9 @@ def extract_article(html: str) -> tuple[str, str]:
 
     for tag in container.find_all(_BOILERPLATE_TAGS):
         tag.decompose()
+    for anchor in container.find_all("a"):
+        if anchor.get_text(strip=True) in {"\u00b6", "#", "\u00a7"}:
+            anchor.decompose()
     body = markdownify(str(container), heading_style="ATX", strip=["a", "img"])
     body = re.sub(r"[ \t]+\n", "\n", body)
     body = re.sub(r"\n{3,}", "\n\n", body).strip()
@@ -377,13 +383,62 @@ def _yaml_quote(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
 
 
+def _fetch_url(url: str) -> httpx.Response:
+    """주소를 가져온다. 접속 실패는 오류 추적 대신 안내 문구와 종료 코드 1로 알린다."""
+    try:
+        resp = httpx.get(url, follow_redirects=True, timeout=30,
+                         headers={"User-Agent": "Mozilla/5.0"})
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code
+        if code in (401, 403, 429):
+            reason = f"이 사이트가 자동 접속을 막았습니다(HTTP {code})."
+        elif code == 404:
+            reason = "주소에 해당하는 페이지가 없습니다(HTTP 404). 주소를 다시 확인하세요."
+        else:
+            reason = f"사이트가 오류를 돌려줬습니다(HTTP {code})."
+        print(f"  오류: {reason}")
+        print("     글을 브라우저로 읽고 핵심만 `uv run python scripts/ingest.py --note \"...\"` 로 옮겨 넣을 수 있습니다.")
+        sys.exit(1)
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:     # 연결 실패, 시간 초과, 잘못된 주소 형식
+        print(f"  오류: 주소에 접속하지 못했습니다({type(exc).__name__}). 인터넷 연결과 주소를 확인하세요.")
+        sys.exit(1)
+    return resp
+
+
+def _is_pdf_response(resp: httpx.Response) -> bool:
+    return "application/pdf" in resp.headers.get("content-type", "").lower() or resp.content[:5] == b"%PDF-"
+
+
+def _pdf_url_to_markdown(url: str, resp: httpx.Response) -> tuple[str, str]:
+    """PDF 주소의 응답에서 (제목, 본문 글자)를 뽑는다. PDF 파일 자체는 저장하지 않는다."""
+    import tempfile
+    from urllib.parse import urlparse
+
+    name = Path(urlparse(url).path).name or "download"
+    with tempfile.TemporaryDirectory() as tmp:
+        pdf = Path(tmp) / (name if name.lower().endswith(".pdf") else f"{name}.pdf")
+        pdf.write_bytes(resp.content)
+        text = extract_text(pdf)
+        title = pdf_title(pdf) or name
+    if not (text or "").strip():
+        print("  오류: 이 PDF에서 글자를 읽지 못했습니다(스캔본이거나 이미지로만 된 PDF일 수 있습니다).")
+        print("     PDF를 내려받아 `ingest.py --file` 로 넣거나, 내용을 `--note` 로 옮겨 넣으세요.")
+        sys.exit(1)
+    return title, text
+
+
 def scrape_url(url: str, resonance: str | None = None) -> Path:
     print(f"  스크랩 중: {url}")
-    resp = httpx.get(url, follow_redirects=True, timeout=30,
-                     headers={"User-Agent": "Mozilla/5.0"})
-    resp.raise_for_status()
+    resp = _fetch_url(url)
 
-    title, md_content = extract_article(resp.text)
+    if _is_pdf_response(resp):
+        # PDF 주소를 웹 페이지처럼 읽으면 깨진 글자 파일이 저장된다. 글자만 뽑아 저장한다.
+        title, md_content = _pdf_url_to_markdown(url, resp)
+        print("  ℹ️ PDF 주소라서 글자만 뽑아 웹 스크랩으로 저장합니다. 신뢰하는 문서로 쓰려면")
+        print("     PDF를 내려받아 `uv run python scripts/ingest.py --file 파일.pdf` 로 넣으세요.")
+    else:
+        title, md_content = extract_article(resp.text)
     if title and not md_content.startswith("# "):
         md_content = f"# {title}\n\n{md_content}"
     date_str = datetime.now().strftime("%Y-%m-%d")

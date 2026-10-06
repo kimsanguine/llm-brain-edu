@@ -105,7 +105,7 @@ _AI_STREAM_MAX_BYTES = 4_000_000
 _AI_CONTEXT_BODY_CHARS = 8000
 
 
-def _collect_context(slugs, wiki_root):
+def _collect_context(slugs, wiki_root, question=""):
     """context_slugs → (context 문자열, 유효 slug 목록, persisted claim ledger).
 
     non-stream/stream 양쪽이 동일 로직을 쓰도록 추출.
@@ -126,8 +126,11 @@ def _collect_context(slugs, wiki_root):
         # Missing persistence authorizes zero claims. Query remains read-only; an
         # explicit `scripts/claims.py build` action creates the ledger.
         ledger = []
+    selected = claim_ledger.select_claims_for_question(
+        ledger, question, project_root=wiki_root.parent, now=_dt.date.today()
+    )
     context = claim_ledger.render_llm_context(
-        ledger, project_root=wiki_root.parent, now=_dt.date.today()
+        selected, project_root=wiki_root.parent, now=_dt.date.today()
     )
     return context, valid, ledger
 
@@ -458,7 +461,7 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
         context_slugs 비어있으면 결과 없음 시나리오 → 사용자 질문만 그대로 전달.
         """
         try:
-            context, valid_slugs, ledger = _collect_context(req.context_slugs, wiki_root)
+            context, valid_slugs, ledger = _collect_context(req.context_slugs, wiki_root, req.question)
         except claim_ledger.ClaimLedgerError as exc:
             return {
                 "status": "error",
@@ -585,7 +588,7 @@ def create_app(wiki_root: Path | None = None) -> FastAPI:
         async def event_gen():
             # malformed/partial persistence rejects the request before LLM invocation.
             try:
-                context, valid_slugs, ledger = _collect_context(req.context_slugs, wiki_root)
+                context, valid_slugs, ledger = _collect_context(req.context_slugs, wiki_root, req.question)
             except claim_ledger.ClaimLedgerError as exc:
                 yield f"event: error\ndata: {_json.dumps(_claim_ledger_error_payload(exc), ensure_ascii=False)}\n\n"
                 return

@@ -521,6 +521,52 @@ def _canonical_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
 
+CONTEXT_MAX_BYTES = 400_000   # 한 번에 모델에 보내는 근거 JSON 상한(약 6만 자 안팎의 한국어)
+
+
+def _char_bigrams(text: str) -> set[str]:
+    grams: set[str] = set()
+    for token in re.findall(r"[0-9a-z가-힣]+", text.lower()):
+        grams.update(token[i : i + 2] for i in range(len(token) - 1))
+    return grams
+
+
+def select_claims_for_question(
+    records: list[ClaimRecord],
+    question: str,
+    *,
+    project_root: Path,
+    now: date | datetime | None = None,
+    max_bytes: int = CONTEXT_MAX_BYTES,
+) -> list[ClaimRecord]:
+    """근거가 상한(max_bytes)을 넘으면 질문과 글자쌍이 많이 겹치는 근거부터 담는다.
+
+    상한 안이면 그대로 돌려준다. 넘는 문서(예: 200쪽 PDF)를 통째로 보내면 모델 호출이
+    실패하거나 느려진다. 사용할 수 있는 trusted 근거를 먼저 담고, 외부 수집물은 남는
+    예산에만 담는다. 인용 검증은 호출부가 전체 원장으로 따로 하므로 여기서 줄여도 안전하다.
+    """
+    sizes = [len(_canonical_json(r.to_mapping()).encode("utf-8")) for r in records]
+    if sum(sizes) <= max_bytes:
+        return list(records)
+    wanted = _char_bigrams(question)
+    ranked = sorted(
+        range(len(records)),
+        key=lambda i: (
+            0 if claim_exclusion_reason(records[i], project_root=project_root, now=now) is None else 1,
+            -len(wanted & _char_bigrams(records[i].statement)),
+            i,
+        ),
+    )
+    chosen: list[int] = []
+    used = 0
+    for i in ranked:
+        if used + sizes[i] > max_bytes:
+            continue
+        chosen.append(i)
+        used += sizes[i]
+    return [records[i] for i in sorted(chosen)]
+
+
 def render_llm_context(
     records: list[ClaimRecord],
     *,

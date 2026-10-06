@@ -208,8 +208,10 @@ async def _terminate_proc(proc) -> None:
             pass
 
 
-def _build_cli_prompt_argv(prompt: str) -> list[str]:
-    return ["claude", "-p", prompt]
+def _build_cli_prompt_argv() -> list[str]:
+    # 프롬프트는 인자가 아니라 표준입력으로 보낸다. 인자로 보내면 운영체제의 명령행 길이
+    # 한계(맥 약 1MB, 윈도우 약 32KB)를 넘는 근거 컨텍스트에서 OSError 가 난다.
+    return ["claude", "-p"]
 
 
 # ---------------------------------------------------------------------------
@@ -264,12 +266,15 @@ async def _call_cli(prompt: str, *, timeout: int) -> str:
     proc = None
     try:
         proc = await asyncio.create_subprocess_exec(
-            *_build_cli_prompt_argv(prompt),
+            *_build_cli_prompt_argv(),
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
         )
-        stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        stdout, _stderr = await asyncio.wait_for(
+            proc.communicate(input=prompt.encode("utf-8")), timeout=timeout
+        )
     finally:
         await _terminate_proc(proc)
     return stdout.decode("utf-8", errors="replace").strip()
@@ -511,11 +516,16 @@ async def stream_llm(
     stderr_task = None
     try:
         proc = await asyncio.create_subprocess_exec(
-            *_build_cli_prompt_argv(prompt),
+            *_build_cli_prompt_argv(),
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
         )
+        assert proc.stdin is not None
+        proc.stdin.write(prompt.encode("utf-8"))
+        await proc.stdin.drain()
+        proc.stdin.close()
         assert proc.stderr is not None
         stderr_task = asyncio.create_task(proc.stderr.read())
         assert proc.stdout is not None

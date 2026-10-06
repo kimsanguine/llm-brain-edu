@@ -43,6 +43,23 @@ class _Reader:
         return b""
 
 
+class _FakeStdin:
+    """asyncio subprocess 의 stdin 흉내 — 프롬프트가 표준입력으로 전달되는지 기록한다."""
+
+    def __init__(self):
+        self.data = b""
+        self.closed = False
+
+    def write(self, data: bytes) -> None:
+        self.data += data
+
+    async def drain(self) -> None:
+        pass
+
+    def close(self) -> None:
+        self.closed = True
+
+
 class _FakeProc:
     """비스트림·스트림 둘 다 정상(done) 경로로 끝나는 fake proc."""
 
@@ -53,6 +70,7 @@ class _FakeProc:
             else ["관련 정보 없음\n".encode()]
         )
         self.stderr = _Reader([])
+        self.stdin = _FakeStdin()
         self._rc = returncode
         self.returncode = None
         self.pid = 4242
@@ -60,7 +78,7 @@ class _FakeProc:
     def kill(self):  # 정상 경로에선 호출 안 됨
         pass
 
-    async def communicate(self):
+    async def communicate(self, input=None):
         self.returncode = 0
         return ("관련 정보 없음".encode(), b"")
 

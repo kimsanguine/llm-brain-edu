@@ -146,7 +146,7 @@ WIKI_ROOT = Path(__file__).parent.parent  # scripts/../ → 프로젝트 루트
 
 | 인자 | 타입 | 설명 |
 |------|------|------|
-| `--url URL` | str | 지정 URL을 스크랩해 `raw/clippings/YYYY-MM-DD-{slug}.md`로 저장 |
+| `--url URL` | str | 지정 URL을 스크랩해 `raw/clippings/YYYY-MM-DD-{slug}.md`로 저장. PDF 주소는 글자만 뽑아 같은 위치에 저장(PDF 원본은 저장 안 함). 접속 실패(403·404·연결 오류)는 안내 문구와 exit `1`, 저장 없음 |
 | `--file PATH` | str | 로컬 파일을 `raw/docs/YYYY-MM-DD-{filename}`으로 복사. `.md`·`.txt` 외 형식은 `.extracted.md`도 함께 저장. 글자 레이어가 없는 PDF(스캔본)는 선택 설치(`uv sync --extra ocr` + Tesseract)가 있으면 OCR 결과로 추출본을 저장(frontmatter `ocr: tesseract`)하고, 없으면 이유와 선택지를 경고한다(원본은 보존) |
 | `--note TEXT` | str | 텍스트를 `raw/notes/YYYY-MM-DD-HHmm-note.md`로 저장 |
 | `--mark-done` | flag | 현재 `raw/`의 모든 파일을 처리 완료로 `.ingest_state.json`에 기록 |

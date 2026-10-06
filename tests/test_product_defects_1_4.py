@@ -281,3 +281,100 @@ def test_wiki_page_title_comes_from_the_pdf_title_for_direct_and_sidecar_pdfs(br
     assert 'title: "Attention Is All You Need"' in joined
     assert 'title: "Another Great Paper"' in joined
     assert "Provided proper attribution" not in joined.split("---", 2)[1]
+
+
+# ── 결함 5~7: 웹 주소 담기의 오류·PDF 주소·제목 (2026-10-06 URL 11종 시험) ─────────
+
+
+def _response(url, *, status=200, text="", content=None, content_type=None):
+    import httpx
+
+    headers = {"content-type": content_type} if content_type else None
+    kwargs = {"content": content} if content is not None else {"text": text}
+    return httpx.Response(status, headers=headers, request=httpx.Request("GET", url), **kwargs)
+
+
+@pytest.mark.parametrize("status, expected", [
+    (403, "자동 접속을 막았습니다"),
+    (404, "페이지가 없습니다"),
+])
+def test_url_ingest_explains_http_errors_instead_of_a_traceback(brain, monkeypatch, capsys, status, expected):
+    """접속이 막히거나 주소가 틀리면 한 줄 안내와 대안(--note)을 보여 주고 아무것도 저장하지 않는다.
+
+    깨지면: 위키백과·뉴욕타임스를 넣은 수강생이 40줄짜리 오류 추적을 보고 설치가 망가진 줄 안다.
+    """
+    url = "https://blocked.example/page"
+    monkeypatch.setattr(ingest.httpx, "get", lambda *a, **k: _response(url, status=status))
+    with pytest.raises(SystemExit) as exc:
+        ingest.scrape_url(url)
+    out = capsys.readouterr().out
+    assert exc.value.code == 1
+    assert expected in out and "--note" in out
+    assert not list((brain / "raw" / "clippings").glob("*.md")) if (brain / "raw" / "clippings").exists() else True
+
+
+def test_url_ingest_explains_connection_failures(brain, monkeypatch, capsys):
+    """없는 도메인이나 끊긴 인터넷도 오류 추적 대신 안내가 나온다."""
+    import httpx
+
+    def refuse(*a, **k):
+        raise httpx.ConnectError("name not known")
+
+    monkeypatch.setattr(ingest.httpx, "get", refuse)
+    with pytest.raises(SystemExit) as exc:
+        ingest.scrape_url("https://no-such-domain.example/")
+    assert exc.value.code == 1
+    assert "접속하지 못했습니다" in capsys.readouterr().out
+
+
+def test_pdf_address_saves_the_extracted_text_not_garbage(brain, tmp_path, monkeypatch, capsys):
+    """PDF 주소(arxiv.org/pdf/...)를 넣으면 글자만 뽑아 읽을 수 있는 웹 스크랩으로 저장한다.
+
+    깨지면: PDF 바이트를 글자로 읽어 3MB 짜리 깨진 파일이 raw/clippings 에 생기고 위키·원장이 쓰레기로 찬다.
+    """
+    pdf = tmp_path / "paper.pdf"
+    _write_pdf(pdf, [(17, "Attention Is All You Need", "Abstract text of the paper goes here.")])
+    url = "https://arxiv.example/pdf/1706.03762"
+    monkeypatch.setattr(ingest.httpx, "get", lambda *a, **k: _response(
+        url, content=pdf.read_bytes(), content_type="application/pdf"))
+
+    saved = ingest.scrape_url(url)
+
+    text = saved.read_text(encoding="utf-8")
+    assert saved.parent.name == "clippings"                  # 웹에서 가져온 글이라 근거 인용 불가 규칙을 그대로 따른다
+    assert 'title: "Attention Is All You Need"' in text
+    assert "Abstract text of the paper" in text
+    assert "%PDF" not in text and "endobj" not in text
+    assert not list((brain / "raw" / "docs").glob("*.pdf"))   # PDF 파일 자체는 저장하지 않는다
+    assert "ingest.py --file" in capsys.readouterr().out      # 신뢰 문서로 쓰는 길을 알려 준다
+
+
+def test_scanned_pdf_address_is_refused_with_a_reason(brain, tmp_path, monkeypatch, capsys):
+    """글자가 없는 스캔본 PDF 주소는 빈 파일을 저장하지 않고 이유와 대안을 말한다."""
+    pdf = tmp_path / "scan.pdf"
+    _write_scanned_pdf(pdf)
+    url = "https://files.example/scan.pdf"
+    monkeypatch.setattr(ingest.httpx, "get", lambda *a, **k: _response(
+        url, content=pdf.read_bytes(), content_type="application/pdf"))
+    with pytest.raises(SystemExit) as exc:
+        ingest.scrape_url(url)
+    assert exc.value.code == 1
+    assert "글자를 읽지 못했습니다" in capsys.readouterr().out
+    assert not (brain / "raw" / "clippings").exists() or not list((brain / "raw" / "clippings").glob("*.md"))
+
+
+def test_extract_article_prefers_the_paper_title_and_drops_heading_anchors():
+    """논문 페이지는 분류 머리글이 아니라 논문 제목을, 문서 사이트는 제목 뒤 ¶ 를 뺀다.
+
+    깨지면: arXiv 초록이 "Computer Science > ..." 라는 제목으로 위키에 올라가고,
+    파이썬 문서의 모든 제목 끝에 ¶ 가 붙는다.
+    """
+    html = ("<html><head><meta name='citation_title' content='Attention Is All You Need'></head><body>"
+            "<h1>Computer Science &gt; Computation and Language</h1>"
+            "<main><h1>Title: Attention Is All You Need</h1>"
+            + "<p>The dominant sequence transduction models are based on complex recurrent networks. </p>" * 6
+            + "<h2>3.1 Encoder<a class='headerlink' href='#enc'>¶</a></h2></main></body></html>")
+    title, body = ingest.extract_article(html)
+    assert title == "Attention Is All You Need"
+    assert "¶" not in body
+    assert "3.1 Encoder" in body

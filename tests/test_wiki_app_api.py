@@ -228,6 +228,23 @@ class _FakeStreamReader:
         return b""
 
 
+class _FakeStdin:
+    """asyncio subprocess 의 stdin 흉내 — 프롬프트가 표준입력으로 전달되는지 기록한다."""
+
+    def __init__(self):
+        self.data = b""
+        self.closed = False
+
+    def write(self, data: bytes) -> None:
+        self.data += data
+
+    async def drain(self) -> None:
+        pass
+
+    def close(self) -> None:
+        self.closed = True
+
+
 class FakeProc:
     """asyncio subprocess 흉내. kill()/wait() 호출을 플래그로 추적."""
 
@@ -236,6 +253,7 @@ class FakeProc:
                  communicate_output: bytes = "관련 정보 없음".encode()):
         self.stdout = _FakeStreamReader(hang=stdout_hang, lines=stdout_lines)
         self.stderr = _FakeStreamReader(lines=[])
+        self.stdin = _FakeStdin()
         self._communicate_hang = communicate_hang
         self._returncode_after_wait = returncode_after_wait
         self._communicate_output = communicate_output
@@ -243,7 +261,8 @@ class FakeProc:
         self.killed = False
         self.waited = False
 
-    async def communicate(self):
+    async def communicate(self, input=None):
+        self.stdin.write(input or b"")
         if self._communicate_hang:
             await asyncio.Future()  # 영원히 hang → wait_for timeout 유발
         self.returncode = 0
@@ -414,6 +433,7 @@ class StderrDrainFakeProc:
         self._stderr_started = asyncio.Event()
         self.stdout = _DrainGatedStdoutReader(stdout_lines, self._stderr_started)
         self.stderr = _GatedStderrReader(stderr_content, self._stderr_started)
+        self.stdin = _FakeStdin()
         self._returncode = returncode
         self.returncode = None
         self.killed = False
@@ -496,6 +516,7 @@ class InfiniteFakeProc:
     def __init__(self, line: bytes = b"tick\n"):
         self.stdout = _InfiniteStdoutReader(line=line)
         self.stderr = _FakeStreamReader(lines=[])
+        self.stdin = _FakeStdin()
         self.returncode = None
         self.pid = 424242
         self.killed = False

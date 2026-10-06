@@ -322,7 +322,7 @@ def test_cli_engine_works_without_openai_package(monkeypatch):
     class _Proc:
         returncode = 0
 
-        async def communicate(self):
+        async def communicate(self, input=None):
             return b"ok", b""
 
         async def wait(self):
