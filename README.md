@@ -574,6 +574,12 @@ anthropic        # API 모드 (선택)
 
 ---
 
+## 선택 연결: Hermes
+
+[Hermes에서 내 Brain 활용하기](HERMES_MCP.md)는 읽기 전용 MCP와 `/llm-brain` 스킬의
+점검·승인 등록·사용 절차를 안내합니다. 기존 Brain 자료와 Mem0 설정은 유지합니다.
+현재 배포 상태와 지원 범위는 해당 안내의 상단에서 확인하세요.
+
 ## 라이선스 *License*
 
 MIT © [kimsanguine](https://github.com/kimsanguine)

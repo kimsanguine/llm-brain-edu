@@ -21,6 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mcp = ["mcp>=1.26,<2"]
 # 스캔본·이미지 PDF 글자 인식(OCR). 기본 설치에는 들어가지 않는다: `uv sync --extra ocr`
 # Tesseract 프로그램(맥: brew install tesseract tesseract-lang)도 따로 설치해야 한다.
 ocr = [
