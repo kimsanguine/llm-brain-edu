@@ -32,7 +32,7 @@ def preview(brain_root: Path, server_root: Path) -> dict:
             "cwd": str(server), "timeout": 30}}}
 
 
-def merge_copy(target: Path, snippet: dict, *, server_name="brain", backup_suffix=".brain-mcp.bak") -> Path:
+def merge_copy(target: Path, snippet: dict, *, server_name="brain", backup_suffix=".brain-mcp.bak", expected_original: bytes | None = None) -> Path:
     target = target.expanduser().absolute()
     if any(p.is_symlink() for p in (target, *target.parents)):
         raise ValueError("Config target and parent directories must not be symlinks")
@@ -40,6 +40,8 @@ def merge_copy(target: Path, snippet: dict, *, server_name="brain", backup_suffi
     if not stat.S_ISREG(initial.st_mode) or initial.st_nlink != 1:
         raise ValueError("Use an existing regular config copy with no hard links")
     original = target.read_bytes()
+    if expected_original is not None and original != expected_original:
+        raise ValueError("Config changed after preflight; refusing overwrite")
     data = yaml.safe_load(original)
     if not isinstance(data, dict):
         raise ValueError("Config must be a YAML mapping")

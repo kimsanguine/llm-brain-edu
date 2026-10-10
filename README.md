@@ -576,6 +576,8 @@ anthropic        # API 모드 (선택)
 
 ## 선택 연결: Hermes
 
+[Hermes 통합 연결 안내](integrations/hermes/README.md)에서 조회와 메모 저장, 한 건 정리, 품질 점검을 한 번의 승인된 설정으로 준비할 수 있습니다. 기존 Mem0와 모델, 읽기 전용 연결은 유지합니다. 관리 기능은 선택 권한이며 AI 모델 호출 허용은 별도입니다.
+
 [Hermes에서 내 Brain 활용하기](HERMES_MCP.md)는 읽기 전용 MCP와 `/llm-brain` 스킬의
 점검·승인 등록·사용 절차를 안내합니다. 기존 Brain 자료와 Mem0 설정은 유지합니다.
 현재 배포 상태와 지원 범위는 해당 안내의 상단에서 확인하세요.

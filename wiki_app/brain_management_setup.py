@@ -1,6 +1,7 @@
 """Preview a separate opt-in management connection; apply only to an approved profile."""
 import argparse
 from pathlib import Path
+import subprocess
 
 import yaml
 
@@ -10,6 +11,15 @@ from wiki_app.hermes_setup import preview, merge_copy, skill_plan, install_skill
 def management_preview(root: Path, *, allow_model_calls=False):
     server = Path(__file__).resolve().parents[1]
     connection = preview(root, server)["mcp_servers"]["brain"]
+    brain = Path(connection["args"][-1])
+    for relative in ("scripts/ingest.py", "scripts/compile.py", "scripts/curate.py", "wiki_app/brain_management_worker.py"):
+        if not (brain / relative).is_file():
+            raise ValueError("Management requires the updated full Brain checkout")
+    # Old read-only runtimes remain usable, but cannot compile one selected note.
+    check = subprocess.run([connection["command"], "-B", "-X", "utf8", str(brain / "scripts/compile.py"), "--help"],
+                           cwd=brain, capture_output=True, timeout=15)
+    if check.returncode or b"--source" not in check.stdout:
+        raise ValueError("Selected-source compiler is not ready; update the Brain code first")
     connection["args"][connection["args"].index("wiki_app.brain_mcp")] = "wiki_app.brain_management"
     connection["args"].append("--allow-writes")
     if allow_model_calls:
@@ -47,7 +57,7 @@ def main():
             print("관리 연결과 llm-brain-manage 스킬을 준비했습니다. 기존 조회 연결은 유지합니다.")
         else:
             print(yaml.safe_dump(snippet, allow_unicode=True, sort_keys=False), end="")
-    except (ValueError, OSError, yaml.YAMLError):
+    except (ValueError, OSError, subprocess.SubprocessError, yaml.YAMLError):
         parser.exit(1, "관리 연결 준비 실패. 일부 단계가 반영됐을 수 있습니다. 설정과 백업은 비공개로 확인하세요.\n")
 
 

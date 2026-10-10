@@ -6,7 +6,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from wiki_app.hermes_setup import main
+from wiki_app.hermes_bundle_setup import main
 
 if __name__ == "__main__":
     main()
