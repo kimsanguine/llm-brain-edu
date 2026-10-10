@@ -279,10 +279,10 @@ def _page_by_rule(raw_file: Path, text: str, title_hint: str | None = None) -> t
 # ---------------------------------------------------------------------------
 
 
-def _build_prompt(raw_file: Path, text: str) -> str:
+def _build_prompt(raw_file: Path, text: str, *, include_index: bool = True) -> str:
     rules = (SCHEMA_DIR / "ingest.md").read_text(encoding="utf-8")
     domains = (SCHEMA_DIR / "domains.yaml").read_text(encoding="utf-8")
-    index = INDEX_FILE.read_text(encoding="utf-8") if INDEX_FILE.exists() else "(아직 비어 있음)"
+    index = (INDEX_FILE.read_text(encoding="utf-8") if INDEX_FILE.exists() else "(아직 비어 있음)") if include_index else "(단일 메모 정리: 기존 목차는 전송하지 않음)"
     rel_raw = raw_file.relative_to(ROOT).as_posix()
     cats = " | ".join(CATEGORIES)
 
@@ -349,11 +349,21 @@ def _parse_live_output(out: str) -> tuple[Path, str] | None:
     return ROOT / rel, body.rstrip() + "\n"
 
 
-async def _page_by_llm(raw_file: Path, text: str) -> tuple[Path, str] | None:
+async def _page_by_llm(raw_file: Path, text: str, *, include_index: bool = True) -> tuple[Path, str] | None:
     # 본문이 그대로 외부 AI 서비스로 나간다. 나가기 전에 한 번 알린다.
     pii.warn_if_pii(text, raw_file.name)
-    out = await llm_client.call_llm(_build_prompt(raw_file, text))
-    return _parse_live_output(out)
+    out = await llm_client.call_llm(_build_prompt(raw_file, text, include_index=include_index))
+    result = _parse_live_output(out)
+    if result is not None and not include_index:
+        # 한 메모의 정리는 그 메모만 출처로 삼아야 한다. 저장 전에 검사한다.
+        match = re.match(r"^---\s*\n(.*?)\n---", result[1], flags=re.DOTALL)
+        try:
+            meta = yaml.safe_load(match.group(1)) if match else None
+        except yaml.YAMLError:
+            return None
+        if not isinstance(meta, dict) or meta.get("sources") != [raw_file.relative_to(ROOT).as_posix()]:
+            return None
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -523,12 +533,25 @@ def main() -> int:
     ap.add_argument("--recompile", action="store_true", help="처리 완료된 raw도 다시 컴파일한다(키가 있으면 API 호출)")
     ap.add_argument("--force", action="store_true", help="--seed 시 기존 위키를 덮어쓴다")
     ap.add_argument("--rule", action="store_true", help="키가 있어도 무료 RULE만 사용한다(모델 호출 없음)")
+    ap.add_argument("--source", help="이 raw/ 상대경로 한 건만 정리한다")
     args = ap.parse_args()
+
+    selected = None
+    if args.source:
+        if args.seed or args.force or args.recompile:
+            ap.error("--source cannot be combined with seed, force or recompile")
+        selected = ROOT / args.source
+        if (Path(args.source).is_absolute() or ".." in Path(args.source).parts
+                or any(p.is_symlink() for p in (selected, *selected.parents))
+                or not selected.is_file() or selected.stat().st_nlink != 1
+                or not selected.resolve().is_relative_to((ROOT / "raw").resolve())
+                or selected.suffix.lower() not in ingest.SUPPORTED_EXTENSIONS):
+            ap.error("--source must be a regular supported file inside raw/")
 
     if args.seed:
         return do_seed(args.force)
 
-    files = (sorted(f for f in ingest.RAW_DIR.rglob("*")
+    files = [selected] if selected else (sorted(f for f in ingest.RAW_DIR.rglob("*")
                     if f.is_file() and f.suffix.lower() in ingest.SUPPORTED_EXTENSIONS)
              if args.recompile else ingest.find_unprocessed())
     twins = [f for f in files if _has_sidecar(f)]      # 사이드카로 정리되는 원본
@@ -581,7 +604,7 @@ def main() -> int:
         result, how = None, "RULE"
         if live:
             try:
-                result = asyncio.run(_page_by_llm(f, text))
+                result = asyncio.run(_page_by_llm(f, text, include_index=False) if selected else _page_by_llm(f, text))
                 how = "LIVE" if result else "RULE"
                 if result is None:
                     live_failed += 1

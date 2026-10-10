@@ -7,6 +7,7 @@
 각 테스트는 "이게 깨지면 수강생에게 무슨 일이 일어나는가"를 주석으로 남긴다.
 """
 import sys
+import asyncio
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -14,6 +15,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import pytest  # noqa: E402
 
 import compile as compile_mod  # noqa: E402
+
+
+def test_selected_prompt_does_not_send_the_whole_index(sandbox):
+    compile_mod.INDEX_FILE.write_text("PRIVATE_UNRELATED_INDEX", encoding="utf-8")
+    raw = _raw(sandbox, "selected.md", "승인한 메모")
+    prompt = compile_mod._build_prompt(raw, "승인한 메모", include_index=False)
+    assert "PRIVATE_UNRELATED_INDEX" not in prompt
+    assert "승인한 메모" in prompt
+
+
+def test_selected_live_rejects_another_source_before_writing(sandbox, monkeypatch):
+    raw = _raw(sandbox, "selected.md", "승인한 메모")
+
+    async def fake_call(prompt):
+        return "PATH: wiki/concepts/wrong.md\n---\ntitle: wrong\nsources: [raw/notes/other.md]\n---\n틀린 출처"
+
+    monkeypatch.setattr(compile_mod.llm_client, "call_llm", fake_call)
+    result = asyncio.run(compile_mod._page_by_llm(raw, "승인한 메모", include_index=False))
+    assert result is None
+    assert not (sandbox / "wiki/concepts/wrong.md").exists()
 
 
 @pytest.fixture

@@ -32,7 +32,7 @@ def preview(brain_root: Path, server_root: Path) -> dict:
             "cwd": str(server), "timeout": 30}}}
 
 
-def merge_copy(target: Path, snippet: dict) -> Path:
+def merge_copy(target: Path, snippet: dict, *, server_name="brain", backup_suffix=".brain-mcp.bak") -> Path:
     target = target.expanduser().absolute()
     if any(p.is_symlink() for p in (target, *target.parents)):
         raise ValueError("Config target and parent directories must not be symlinks")
@@ -44,10 +44,10 @@ def merge_copy(target: Path, snippet: dict) -> Path:
     if not isinstance(data, dict):
         raise ValueError("Config must be a YAML mapping")
     servers = data.get("mcp_servers", {})
-    if not isinstance(servers, dict) or "brain" in servers:
+    if not isinstance(servers, dict) or server_name in servers:
         raise ValueError("Existing brain server or invalid mcp_servers; refusing overwrite")
     data["mcp_servers"] = {**servers, **snippet["mcp_servers"]}
-    backup = target.with_name(target.name + ".brain-mcp.bak")
+    backup = target.with_name(target.name + backup_suffix)
     # Exclusive creation prevents overwriting backups or following backup symlinks.
     backup_fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(backup_fd, "wb") as file:
@@ -65,9 +65,11 @@ def merge_copy(target: Path, snippet: dict) -> Path:
     return backup
 
 
-def skill_plan(home: Path, source: Path) -> tuple[Path, bytes]:
+def skill_plan(home: Path, source: Path, *, skill_name="llm-brain") -> tuple[Path, bytes]:
     """Inspect the chosen profile without creating folders or replacing user skills."""
-    target = home.expanduser().absolute() / "skills/llm-brain/SKILL.md"
+    if skill_name not in ("llm-brain", "llm-brain-manage"):
+        raise ValueError("Unsupported Brain skill name")
+    target = home.expanduser().absolute() / f"skills/{skill_name}/SKILL.md"
     if any(p.is_symlink() for p in (target, *target.parents)):
         raise ValueError("Skill path must not contain symlinks")
     content = source.read_bytes()
@@ -76,13 +78,13 @@ def skill_plan(home: Path, source: Path) -> tuple[Path, bytes]:
     return target, content
 
 
-def install_skill(home: Path, source: Path) -> Path:
-    target, content = skill_plan(home, source)
+def install_skill(home: Path, source: Path, *, skill_name="llm-brain") -> Path:
+    target, content = skill_plan(home, source, skill_name=skill_name)
     if target.exists():
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
     # Recheck after directory creation. Exclusive creation never overwrites a file.
-    skill_plan(home, source)
+    skill_plan(home, source, skill_name=skill_name)
     fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "wb") as file:
         file.write(content)
