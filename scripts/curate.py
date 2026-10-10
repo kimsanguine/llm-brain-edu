@@ -1618,7 +1618,10 @@ def main() -> None:
         run_reweave(fix=args.fix, dry_run=True, weekly_summary=args.weekly_summary)
         return
 
-    run_all = args.all or not any([args.audit, args.distill, args.lifecycle, args.reweave])
+    # A bare learner invocation only audits. Knowledge-changing modes are opt-in.
+    if not any([args.all, args.audit, args.distill, args.lifecycle, args.reweave]):
+        args.audit = True
+    run_all = args.all
     pages = find_all_wiki_pages()
     print(f"[curate] {datetime.now().strftime('%Y-%m-%d %H:%M')} — {len(pages)}개 페이지 분석")
 

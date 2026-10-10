@@ -283,7 +283,7 @@ def test_lifecycle_no_sources_yaml_does_not_crash(monkeypatch, tmp_path):
 
 
 def test_bare_curate_no_sources_yaml_does_not_crash(monkeypatch, tmp_path):
-    """RED→GREEN: 인자 없는 bare curate(=run_all) 가 sources.yaml 없어도 크래시 안 함."""
+    """인자 없는 점검이 sources.yaml 없어도 크래시하지 않는다."""
     valid_page = (
         "---\ntitle: P\ntype: insight\ncreated: 2026-01-01\n---\n\n본문.\n"
     )
@@ -293,7 +293,22 @@ def test_bare_curate_no_sources_yaml_does_not_crash(monkeypatch, tmp_path):
     (tmp_path / "schema").mkdir()
 
     _patch_module_paths(monkeypatch, tmp_path, wiki)
-    monkeypatch.setattr(sys, "argv", ["curate.py"])  # bare = run_all
+    monkeypatch.setattr(sys, "argv", ["curate.py"])
 
     # main() 이 FileNotFoundError 로 죽지 않아야 한다.
     curate.main()
+
+
+@pytest.mark.parametrize("arguments, should_change", [([], False), (["--all"], True)])
+def test_default_audit_preserves_page_but_explicit_all_keeps_distill(monkeypatch, tmp_path, arguments, should_change):
+    """Bare invocation must not rewrite learner knowledge; explicit all remains available."""
+    wiki = _make_wiki(tmp_path, "---\ntitle: P\ntype: concept\ncreated: 2026-01-01\n---\n\nKeep this source-backed text.\n")
+    _patch_module_paths(monkeypatch, tmp_path, wiki)
+    monkeypatch.setattr(curate.episode, "EPISODES_DIR", tmp_path / "episodes")
+    monkeypatch.setattr(sys, "argv", ["curate.py", *arguments])
+    page = wiki / "concepts/second-brain.md"
+    original = page.read_bytes()
+    curate.main()
+    assert (page.read_bytes() != original) is should_change
+    assert (wiki / "curate_report.md").is_file()
+    assert (wiki / "distill_queue.md").exists() is should_change

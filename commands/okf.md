@@ -5,6 +5,8 @@ description: wiki → private OKF export 또는 명시적 Share-ready manifest g
 llm-brain의 okf 커맨드입니다. `wiki/`(내부 슈퍼셋)를 OKF v0.1 호환 번들 `okf/`로
 투영합니다. 기본 경로는 기존 개인용 export이고, 외부 공유는 별도의 `--share` gate만 사용합니다.
 `$ARGUMENTS`에 따라 아래를 실행하세요.
+`--share`가 있으면 아래 Share-ready 절차만 따른다. private Step 1/2에 공유 인자를
+붙이지 않는다. `--share --dry-run`은 허용되지 않으며 공유 경로는 자체 preflight를 수행한다.
 
 ## 인자 파싱
 
@@ -68,10 +70,12 @@ uv run python scripts/okf_export.py --dry-run $ARGUMENTS
 ```
 
 출력에서 사람이 **직접 확인**:
-- `business 제외 4건`이 목록에 있는가
+
+- `business/` 등 정책상 제외 경로가 실제 목록에서 제외됐는가
 - `sensitive_hits=0` 인가 (본문 평문 민감정보 후보 0)
-- `excluded` 카운트 = business 4 + 민감 slug 수 (기대값과 일치 — local.yaml 부재면 `pages`가 늘고
-  민감 페이지가 included로 조용히 섞이니 카운트 대조 필수)
+- `excluded` 카운트가 현재 wiki와 base/local 정책에서 직접 확인한 기대값과 일치하는가.
+  경로, slug, private scope 등 제외가 겹칠 수 있으므로 고정 수치나 단순 합산을 쓰지 않는다.
+  local 정책이 없는 private dry-run은 민감정보 검토를 대신하지 못하며 공유 승인으로 쓰지 않는다.
 
 누출 후보가 보이면: 해당 페이지 slug를 `schema/okf_export.local.yaml`의 `exclude_slugs`에 추가하고
 dry-run을 다시 돌려 `sensitive_hits=0`으로 수렴시킨다.
@@ -89,7 +93,8 @@ uv run python scripts/okf_export.py $ARGUMENTS
 ## Step 3: 결과 요약 (한국어)
 
 - pages / links / ghost / excl_refs / excluded / sensitive_hits 통계
-- round-trip 무결성(원하면 `okf/`에 design.md §11 minimal consumer 적용해 dangling 0 확인)
+- 링크 변환과 제외 참조 결과는 `schema/okf.md`의 변환 계약과 실제 산출물로 확인한다.
+  소비자 도구에서 다시 읽는 검증을 수행하지 않았다면 round-trip은 미검증으로 보고한다.
 - private `okf/`는 Share-ready 증거가 아니다. 공개 후보는 `--share`의 `okf-share/`와
   redacted manifest만 검토한다. push는 별도 사람 승인 후 수행한다.
 

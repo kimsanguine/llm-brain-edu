@@ -43,11 +43,14 @@
 
 ### curate
 ```
+"curate"               # 기본 audit: 후보 보고만
+"curate --audit"       # 지식 페이지와 raw 미변경
 "curate --distill"     # distill_level 점진 압축
 "curate --lifecycle"   # TTL 초과 페이지 archive 후보
 "curate --all"         # 전체 실행 (audit + distill + lifecycle)
 ```
 `scripts/curate.py` 실행 → `schema/curate.md` 규칙 적용
+audit는 보고서·후보 큐·로그/episode를 기록하고 끝낸다. 큐의 수정 지시를 자동 실행하지 않는다. distill은 큐/메타데이터 준비이며 실제 본문 압축·보강·종합·모순 화해는 대상과 변경 범위의 별도 명시 요청 또는 승인 후 수행한다. 다중 raw 출처 페이지는 자동 `claims.py build`가 fail closed하므로 자동 query용 wiki에 종합을 적용하거나 출처를 축소해 우회하지 않는다. `--reweave`의 observing 만료 이동과 `--fix`의 기계적 메타데이터 보정은 승인된 범위에서만 실행한다.
 
 ### export-graph (wikilink 그래프 export)
 ```
@@ -60,7 +63,8 @@ mini-graph는 `wiki_app` `/api/page/{slug}/graph` 엔드포인트로 조회.
 ```
 "okf 해줘"                     # /llm-brain:okf — 먼저 dry-run 검토 후 okf/ 번들 생성
 "/llm-brain:okf --dry-run"      # export 대상·제외·통계만 (파일 미작성, 보안 검토용)
-"/llm-brain:okf --strip-internal"  # 외부 공유본 (x-llmbrain-* 제거)
+"/llm-brain:okf --strip-internal"  # 내부 필드 제거만 (공개 승인 아님)
+"/llm-brain:okf --share --strip-internal" # 사람 승인과 Share-ready 게이트 필요
 ```
 `okf` 커맨드(`commands/okf.md`)가 `scripts/okf_export.py`를 실행해 `wiki/`를
 OKF v0.1(Google Open Knowledge Format) 호환 번들 `okf/`로 투영한다 (동료·외부 에이전트·habix
@@ -74,9 +78,7 @@ OKF v0.1(Google Open Knowledge Format) 호환 번들 `okf/`로 투영한다 (동
 
 > ⚠ **drift 주의**: `okf/`는 export 시점 스냅샷이다. `wiki/` 갱신 후 재export 안 하면 stale.
 > 🔴 **public 커밋 전 보안 게이트 (one-way door)**: `okf/`는 Git 커밋·push되면 history 영구.
-> 커밋 전 `--dry-run`으로 ① `business/` 제외 ② `sensitive_hits=0` ③ `excluded` 카운트=기대값을
-> 사람이 확인. fresh clone/CI엔 `okf_export.local.yaml`이 없어 게이트가 비활성(stderr 🔴 경고) —
-> 그 상태로 커밋 금지.
+> 공유용 export는 `commands/okf.md`의 `--share` 경로와 사람 승인, local 정책 및 scope 검증을 따른다. `--strip-internal`이나 dry-run 성공만으로 공유가 승인되지 않는다. local 정책이 없는 fresh clone/CI 상태로 공유하지 않는다.
 
 ### query
 ```

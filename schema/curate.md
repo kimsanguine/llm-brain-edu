@@ -1,15 +1,15 @@
 # Curate 규칙
 
 curate는 wiki 전체를 감사(audit) + 압축(distill) + 수명 관리(lifecycle)하는 복합 오퍼레이션이다.
-주 1회 자동 실행 또는 `curate --all` 온디맨드 실행.
+에이전트의 기본 요청은 `curate --audit` 후보 보고다. 본문·frontmatter 압축, 보강, 종합, 화해는 대상과 변경 범위의 별도 명시 요청 또는 승인 후 수행한다.
 
 ## 플래그별 실행 범위
 
 | 플래그 | 수행 단계 |
 |---|---|
 | `--all` | audit + distill + lifecycle 전체 |
-| `--audit` | audit만 |
-| `--distill` | distill만 |
+| `--audit` | 후보 보고만 (보고서·큐·로그/episode 기록, 지식 페이지와 raw 미변경) |
+| `--distill` | 후보 큐 생성 및 distill 메타데이터 준비; 본문 압축은 별도 승인 |
 | `--lifecycle` | lifecycle 후보 목록만 (실제 이동은 사용자 확인 후) |
 
 ---
@@ -34,16 +34,16 @@ wiki/ 전체를 스캔해 품질 문제를 탐지한다.
 **Stale 링크**: `[[페이지명]]`이 존재하지 않는 페이지를 가리키는 경우
 
 ### 산출물
-`wiki/curate_report.md` 갱신 — 문제 목록 + 권장 조치
+`wiki/curate_report.md` 갱신 — 문제 목록 + 권장 조치. 모순 후보가 있으면 `wiki/contradiction_queue.md`를 기록하고 실행 로그/episode도 남긴다. 기존 지식 페이지 본문·frontmatter와 raw는 수정하지 않는다. 생성된 큐 안의 본문 수정 문구는 기본 audit 실행 권한이 아니다.
 
 ---
 
 ## 2단계: DISTILL
 
-도메인별로 wiki 페이지들을 읽고 고밀도 인사이트 페이지를 생성한다.
+스크립트는 압축 후보를 분류해 `wiki/distill_queue.md`를 만들고 distill 메타데이터를 준비한다. 아래 본문 압축·인사이트 생성 정책은 별도로 승인된 에이전트 작업이며 스크립트가 자동 수행하지 않는다.
 
 ### 실행 대상
-`wiki/insights/` — TIL·meetings에서 반복 등장한 패턴 압축
+큐에 보고된 기존 페이지. `wiki/insights/`의 TIL·meetings 반복 패턴 압축은 별도 검토용 정책이며, 다중 출처가 필요한 경우 아래 자동 근거 원장 지원 경계를 먼저 따른다.
 
 ### 압축 기준
 - 동일 개념이 3개 이상 wiki 페이지에서 언급 → insights/ 페이지로 압축
@@ -79,7 +79,7 @@ wiki/ 전체를 스캔해 품질 문제를 탐지한다.
 1. 후보 목록을 `wiki/curate_report.md`에 작성
 2. **사용자가 목록을 확인하고 승인**
 3. 승인된 항목만 `wiki/archive/` 로 이동
-4. 영구 삭제는 `--purge` 플래그 명시 시에만 실행
+4. `--purge`는 승인된 archive 후보를 이동하는 옵션이며 영구 삭제 옵션이 아니다. 영구 삭제는 이 절차에서 실행하지 않는다.
 
 ### 실행 금지
 - 자동으로 파일 이동/삭제하지 않는다 (사용자 확인 필수)
@@ -116,6 +116,8 @@ wiki/ 전체를 스캔해 품질 문제를 탐지한다.
 
 > 아래 3개 절은 v0.3 신설 규칙이며, 현재 공개 설계 기준은 `SPEC.md`의 "v0.3 Quality-Driven Curation" 절이다.
 > LLM 실행 경계(SPEC §A): 결정적 판정·스캔·큐 생성은 `scripts/`가 수행하고, LLM 컴파일러는 아래 규칙을 생성·강화·화해 작업의 판정 근거로 사용한다.
+
+이 절의 Promotion Gates는 선택 품질 정책이다. 현재 `compile.py`의 RULE/LIVE 경로가 모든 신규 페이지에 G-1~G-4를 자동 적용하는 것은 아니다. 큐 생성·기계적 보정과 에이전트의 승인된 본문 작업을 구분한다.
 
 ## Promotion Gates (G-1~G-4)
 
@@ -183,12 +185,16 @@ observation_expires: 2026-07-11  # gate_status: observing일 때만
 
 ## Synthesis Rules
 
+### 현재 자동 근거 원장과의 지원 경계
+
+`scripts/claims.py build`는 페이지의 `sources`가 정확히 하나의 `raw/**` 경로일 때만 자동 원장을 만든다(`schema/claim_ledger.md`). 아래 다중 출처 종합은 statement별 출처 귀속이 아직 지원되지 않아 자동 build 전체를 fail closed하고 원장 쓰기를 중단시킬 수 있다. 이 안전 경계를 우회하거나 출처를 하나로 축소하지 않는다. 현재 자동 query용 wiki에는 다중 출처 종합을 저장하지 않고 후보 보고로 남긴다. 별도 검토용 산출물은 사용자가 위치와 목적을 명시해 승인한 경우에만 작성하며, 자동 원장과 query 호환을 주장하지 않는다.
+
 > 2단계 DISTILL의 "동일 개념이 3개 이상 wiki 페이지에서 언급 → insights/ 압축" 규칙의 **확장**이다 (대체 아님).
 > insights/ 압축은 그대로 유지하고, 아래는 **개별 페이지 내부**의 교차 종합 규칙을 추가한다 (WS-1, v0.3.1).
 
 ### 생성 규칙 — `## 인사이트 (종합)` 섹션
 
-대상 페이지(`wiki/reweave_queue.md`의 synthesis 대상)마다 본문에 `## 인사이트 (종합)` 섹션을 생성·갱신한다. 3요건 필수:
+별도로 승인된 검토용 종합에만 아래 생성 규칙을 적용한다. 큐에 선정됐다는 이유로 자동 query용 페이지를 수정하지 않는다. 3요건 필수:
 
 - (a) **2개+ raw 소스 교차 인용** — 서로 다른 raw/ 파일 2개 이상에서 근거를 끌어와 교차시킨다. 단일 소스 요약은 종합이 아니다.
 - (b) **강한 각도 1~3개** — 소스들을 관통하는 판단·관점을 1~3개로 압축한다 (사실 나열 금지).
@@ -204,13 +210,15 @@ synthesis_updated: YYYY-MM-DD          # 마지막 종합 갱신일
 
 ### 불변식 (위반 시 저장 금지)
 
-- **기존 본문·sources 삭제·단축 절대 금지** — append/갱신만 허용. 스크립트 shrink 가드가 본문·sources 감소 시 저장을 거부한다 (`WARN shrink`).
+- **기존 본문·sources 삭제·단축 절대 금지** — append/갱신만 허용. 현재 reweave는 이전 스냅샷 대비 축소를 `WARN shrink`로 보고하며 저장 자체를 차단하지 않는다. 작성 주체가 저장 전에 이 불변식을 확인한다.
 - **근거 없는 종합 금지** — 종합의 모든 진술은 raw/ 출처가 있어야 한다. 인용한 raw가 `sources`에 없으면 추가한다.
 
 ## Reconciliation Rules
 
 > WS-5 (v0.3.1 구현됨). 결정적 모순 후보 탐지(→ `wiki/contradiction_queue.md`)는 스크립트(`reconcile` 코어, 후보 ≥1일 때만 큐 생성)가 수행하고,
 > 화해 서술은 아래 규칙으로 LLM 컴파일러가 수행한다 — 1단계 AUDIT "모순 감지" 리포트를 실행 규칙으로 채우는 형태.
+
+audit는 모순 후보 보고에서 끝난다. 아래 화해 본문·frontmatter 쓰기는 대상과 수정 범위에 대한 별도 명시 요청 또는 승인 후에만 수행한다. 추가 출처로 다중 sources가 된다면 위 자동 근거 원장 지원 경계를 먼저 확인한다.
 
 ### 화해 서술 — `## 반론/갱신 (YYYY-MM-DD)` append
 

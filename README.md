@@ -254,23 +254,25 @@ uv run python scripts/compile.py --rule
 
 ### 🔁 curate — 정리: 압축·수명 관리 *Curate · Progressive Summarization*
 
-**한 줄로: 쌓인 지식을 '정리'하기.** 자주 보는 페이지일수록 더 짧게 압축(distill, 압축 정리)하고, 오래 안 본 페이지는 archive(보관) 후보로 내린다. **v0.3부터는 시간이 아니라 품질로 정리한다** — 매일 약한 페이지를 자동 점검·보강하고, 여러 메모를 하나의 판단으로 종합하며, 새 근거가 옛 결론과 충돌하면 명시적으로 화해한다.
+**한 줄로: 쌓인 지식의 정리 후보를 확인하기.** 기본 audit는 약한 연결과 모순 후보를 보고한다. distill은 압축 후보를, lifecycle은 archive(보관) 후보를 만든다. 실제 본문 압축·보강·화해는 대상과 수정 범위에 대한 별도 요청 또는 승인 후 진행한다.
 
 ▶ **Claude Code 입력창**에 입력:
 
 ```
-/llm-brain:curate --reweave     # (v0.3·매일 권장) 약한 페이지 점검 → 자동 보강 가능분은 즉시 수리
+/llm-brain:curate              # 기본 audit: 후보 보고, 지식 페이지 미수정
+/llm-brain:curate --reweave --dry-run # weak/종합/만료 이동 계획만 확인
+/llm-brain:curate --reweave     # 후보 큐 생성 + observing 만료 이동 (승인된 범위)
 /llm-brain:curate --reweave --fix   # 자동 보강까지 실제 적용 (요약·근거수 등 기계적 결손)
-/llm-brain:curate --distill     # 자주 본 페이지를 한 단계 더 압축 + 여러 소스 교차 종합
+/llm-brain:curate --distill     # 압축 큐 생성 + 메타데이터 준비 (본문 압축 별도 승인)
 /llm-brain:curate --lifecycle   # 보관 기한(TTL) 지난 페이지를 archive 후보로
 /llm-brain:curate --all         # 전체 실행 (점검 + 압축 + 수명 관리)
 ```
 
 각 페이지는 frontmatter(페이지 머리말 정보)에 `distill_level`(압축 단계: 0=원문 → 3=한 줄)과 `access_count`(명시적으로 기록한 접근 횟수)를 둘 수 있다. 검색·페이지 보기·AI query는 이 값을 자동 변경하지 않는다. 접근을 집계하려면 별도의 `curate --record-access PAGE_SLUG`를 실행하고, 기록된 값은 distill 우선순위에 사용할 수 있다.
 
-**v0.3 품질 정책** — 새 페이지는 **Promotion Gates**(반복 ≥2회·본문 ≥800자·근거 ≥2건 등)를 통과해야 정식 승격되고, 미달은 `wiki/observing/`(7일 유예)·`wiki/rejected/`로 라우팅된다. `--reweave`는 약한 노드(본문<800자·근거<2건)를 매일 잡아 기계적 결손만 자동 수리하고 판단이 필요한 건 큐로 남긴다(가짜 보강 금지). 여러 메모가 같은 주제를 건드리면 `## 인사이트 (종합)`으로 교차 종합하고, 모순이 감지되면 옛 주장을 지우지 않고 `## 반론/갱신` + `superseded` 표시로 화해한다.
+**v0.3 품질 정책** — **Promotion Gates**(반복 ≥2회·본문 ≥800자·근거 ≥2건 등)는 선택 정책이며, 현재 RULE/LIVE compile이 모든 신규 페이지에 이 게이트를 자동 적용하지는 않는다. `--reweave`는 약한 페이지와 종합 후보를 큐로 남기고 observing 만료 이동을 수행한다. summary·source_count·updated의 기계적 보정은 `--fix`를 함께 지정해야 적용된다. 본문·근거 부족은 자동 보정하지 않는다. 모순 화해는 후보 보고 후 별도로 승인된 본문 작업이다.
 
-> 압축 단계·접근 집계의 동작 방식, Promotion Gates·reweave·종합·모순 화해 규칙, wikilink 그래프(`wiki/graph.json`) 분석, Agent Memory OS의 선택 필드(`memory_type` 등)는 모두 자동 처리된다. 상세: `SPEC.md`.
+> 자동 근거 원장은 페이지당 정확히 하나의 raw 출처만 지원한다. 다중 출처 종합은 자동 build 전체를 fail closed할 수 있어 자동 query용 wiki에 적용하지 않는다. 출처를 숨기거나 줄여 우회하지 말고 검토 후보로 보고한다. 스크립트의 큐/기계적 처리와 승인된 에이전트 본문 작업, 검토용 종합의 지원 경계는 `schema/curate.md`와 `SPEC.md`를 따른다.
 
 ---
 

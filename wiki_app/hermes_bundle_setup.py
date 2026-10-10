@@ -35,12 +35,12 @@ def _same_brain_reader(current, desired) -> bool:
         return False
 
 
-def apply_bundle(config: Path, snippet: dict) -> None:
+def apply_bundle(config: Path, snippet: dict, *, migrate_public_skill=False) -> None:
     config = config.expanduser().absolute()
     # Check every destination before the first write. Never replace a custom skill.
     sources = Path(__file__).resolve().parents[1] / "integrations/hermes"
-    for name in ("llm-brain", "llm-brain-manage"):
-        skill_plan(config.parent, sources / name / "SKILL.md", skill_name=name)
+    source = sources / "llm-brain/SKILL.md"
+    skill_plan(config.parent, source, migrate_public_skill=migrate_public_skill)
     if any(p.is_symlink() for p in (config, *config.parents)) or config.stat().st_nlink != 1:
         raise ValueError("Use an existing regular unlinked profile config")
     original = config.read_bytes()
@@ -58,8 +58,7 @@ def apply_bundle(config: Path, snippet: dict) -> None:
     if missing:
         merge_copy(config, {"mcp_servers": missing}, server_name=next(iter(missing)),
                    backup_suffix=".brain-hermes.bak", expected_original=original)
-    for name in ("llm-brain", "llm-brain-manage"):
-        install_skill(config.parent, sources / name / "SKILL.md", skill_name=name)
+    install_skill(config.parent, source, migrate_public_skill=migrate_public_skill)
 
 
 def main() -> None:
@@ -72,17 +71,20 @@ def main() -> None:
     parser.add_argument("--with-management", action="store_true", help="Select save, organize and audit capabilities; does not itself write config")
     parser.add_argument("--brain-root", type=Path, default=Path.cwd())
     parser.add_argument("--server-root", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--apply", type=Path, help="Approve both connections and both skills for this existing profile config")
-    parser.add_argument("--install-skill", action="store_true", help="Compatibility option; both skills are already included with management apply")
+    parser.add_argument("--apply", type=Path, help="Approve both connections and the canonical llm-brain skill for this existing profile config")
+    parser.add_argument("--install-skill", action="store_true", help="Compatibility option; llm-brain is already included with management apply")
+    parser.add_argument("--migrate-public-skill", action="store_true", help="Approve backed-up migration of the known public reader skill only; requires --with-management and --apply")
     parser.add_argument("--allow-model-calls", action="store_true", help="Permit explicit LIVE calls, including source/rules transmission and possible cost")
     args = parser.parse_args()
     if args.install_skill and not args.apply:
         parser.error("--install-skill requires --apply CONFIG_PATH approval")
+    if args.migrate_public_skill and (not args.with_management or not args.apply):
+        parser.error("--migrate-public-skill requires --with-management and --apply CONFIG_PATH approval")
     try:
         snippet = bundle_preview(args.brain_root, args.server_root, allow_model_calls=args.allow_model_calls)
         if args.apply:
-            apply_bundle(args.apply, snippet)
-            print("조회와 관리 연결, 두 스킬 준비 완료. 기존 연결은 보존하며 동일한 항목은 변경하지 않았습니다.")
+            apply_bundle(args.apply, snippet, migrate_public_skill=args.migrate_public_skill)
+            print("조회와 관리 연결, /llm-brain 스킬 준비 완료. 기존 연결은 보존하며 동일한 항목은 변경하지 않았습니다.")
             print("설정 변경 시 .brain-hermes.bak 백업이 생성됩니다. 같은 프로필에서 두 MCP를 점검하세요.")
         else:
             print(yaml.safe_dump(snippet, allow_unicode=True, sort_keys=False), end="")

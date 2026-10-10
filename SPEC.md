@@ -160,7 +160,7 @@ WIKI_ROOT = Path(__file__).parent.parent  # scripts/../ → 프로젝트 루트
 | 코드 | 의미 |
 |------|------|
 | `0` | 처리할 새 파일 없음. **hard dedup 차단으로 저장이 보류된 경우도 0** (차단은 오류가 아님) |
-| `1` | 미처리 파일이 1개 이상 존재 (`run_daily.sh`가 이를 감지해 LLM 호출 결정). **목록 모드(인자 없음·`--priority-only`)에만 해당** — `--url`·`--file`·`--note` 저장 모드는 저장이 끝나면 미처리 파일이 남아 있어도 `0` |
+| `1` | 미처리 파일이 1개 이상 존재. **목록 모드(인자 없음·`--priority-only`)에만 해당** — `--url`·`--file`·`--note` 저장 모드는 저장이 끝나면 미처리 파일이 남아 있어도 `0` |
 
 #### resonance 필터 동작
 
@@ -232,7 +232,7 @@ wiki 전체를 감사(audit) + 압축(distill) + 수명 관리(lifecycle)하는 
 | 인자 | 설명 |
 |------|------|
 | `--all` | audit + distill + lifecycle 전체 실행 |
-| `--audit` | orphan 페이지·stale 링크 탐지 |
+| `--audit` | orphan·stale 링크·모순 후보 보고. 보고서·큐·로그/episode만 기록하며 지식 페이지 본문·frontmatter와 raw 미변경 |
 | `--distill` | distill 후보 분류 및 `wiki/distill_queue.md` 생성 |
 | `--lifecycle` | lifecycle archive/delete 후보 목록 생성 |
 | `--purge` | `curate_report.md`의 archive 후보를 `wiki/archive/`로 실제 이동 |
@@ -244,7 +244,7 @@ wiki 전체를 감사(audit) + 압축(distill) + 수명 관리(lifecycle)하는 
 | `--dry-run` | `--reweave` 조합: 아무 파일도 변경·생성하지 않고 계획만 stdout 출력 (리포트·큐·episode 미기록) |
 | `--weekly-summary` | `--reweave` 조합: 최근 28일 reweave 에피소드에서 4회+ 반복 weak 노드를 통합/삭제 후보로 리포트. episodes 부재/부족 시 현재 스캔만으로 후보 + "이력 부족" 정직 표기 |
 
-인자 없이 실행하면 `--all`과 동일하게 동작한다.
+인자 없이 실행하면 `--audit`과 동일하게 동작한다. 명시적 `--all`은 distill 메타데이터 준비까지 포함한다. 큐를 보고 실제 본문 압축·보강·화해를 하는 작업은 대상과 수정 범위의 별도 명시 요청 또는 승인 후에만 진행한다.
 
 #### distill_level 단계 정의
 
@@ -264,7 +264,7 @@ wiki 전체를 감사(audit) + 압축(distill) + 수명 관리(lifecycle)하는 
 | `wiki/curate_report.md` | 항상 생성 (audit·distill·lifecycle·reweave 결과 통합) |
 | `wiki/distill_queue.md` | `--distill` 또는 `--all` 실행 시 |
 | `wiki/reweave_queue.md` | `--reweave` 실행 시 (판단 필요분 큐 `## 판단 필요분` + 종합 대상 큐 `## 종합 대상`(v0.3.1 WS-1) — LLM 컴파일러가 `commands/curate.md` Step 3에서 소비. `--dry-run` 시 미작성) |
-| `wiki/contradiction_queue.md` | `--audit`/`--all` 실행 시 **모순 후보가 1건 이상일 때만**(v0.3.1 WS-5 — 후보 0이면 미생성, 오탐 남발 방지). 가장 최근 raw × 기존 페이지를 `reconcile.detect_contradiction_candidates`로 대조. 화해 서술은 `commands/curate.md` Step |
+| `wiki/contradiction_queue.md` | `--audit`/`--all` 실행 시 **모순 후보가 1건 이상일 때만**. 가장 최근 raw × 기존 페이지를 대조하며 기본은 후보 보고. 화해 서술은 `commands/curate.md`의 별도 승인 단계 |
 | `wiki/.synthesis_snapshot.json` | `--reweave`(비 dry-run) 실행 시 — synthesis 대상 본문·근거 스냅샷. 다음 run 에서 `synthesis.guard_no_shrink`로 축소 감지(WARN shrink). gitignored·wiki 페이지 아님 |
 
 #### memory_score — 메타 기억 점수 (US-006, 재사용 우선·결정적)
@@ -734,37 +734,11 @@ query에서는 호출하지 않는다. `distill` 실행 시 두 값 중 큰 값�
 
 ---
 
-## 자동화 — OpenClaw cron (구 launchd, 2026-06-02 전환)
+## 자동화 지원 경계
 
-> **2026-06-02 변경:** launchd 잡 `ai.habix.llm-wiki`는 macOS TCC가 `~/Documents` 하위 스크립트 exec을 차단해 매일 `exit 126`으로 실패(`.launchd.log` 도배)하여 **제거**했다. 데일리 자동화는 이제 OpenClaw cron `llm-wiki-daily`(`~/.openclaw/cron/jobs.json`, `0 07 * * *` Asia/Seoul, `agentTurn`)가 담당하며 STEP 1 `sync_raw.py --quiet` → STEP 2 `ingest.py` 미처리 확인 → STEP 3 CLAUDE.md 규칙대로 claude ingest 후 `ingest.py --mark-done`을 수행한다. **STEP 4(주간 월요일 `curate --audit --lifecycle` + distill)도 2026-06-02 cron 페이로드에 추가**되어 `date +%u == 1`(월요일)에만 실행된다. 아래 launchd/`run_daily.sh` 기술은 **참조용**이다.
+이 공개 배포판은 개인 운영용 cron·launchd 설정이나 `run_daily.sh`를 제공하지 않는다. 과거 개인 환경의 경로·실행 이력은 현재 설치 및 운영 계약의 근거가 아니다. 현재 지원 명령은 위 스크립트 인터페이스와 `AGENTS.md`를 따른다.
 
-### (참조) 구 launchd 설정
-
-### plist 경로
-
-```
-~/Library/LaunchAgents/ai.habix.llm-wiki.plist
-```
-
-Label: `ai.habix.llm-wiki`
-
-### 실행 시간
-
-매일 오전 7시 0분 (`StartCalendarInterval: Hour=7, Minute=0`).  
-`RunAtLoad: false` — 등록 즉시 실행하지 않음.
-
-로그 경로: `260516_llm_brain/.launchd.log` (stdout·stderr 동일 파일)
-
-### run_daily.sh 4단계 플로우
-
-스크립트 위치: `wiki/projects/260515_llm_wiki/scripts/run_daily.sh`
-
-| 단계 | 동작 | 조건 |
-|------|------|------|
-| **Step 1** | `sync_raw.py --quiet` 실행 — sources.yaml 소스에서 raw/ 델타 미러링 | 항상 실행 |
-| **Step 2** | `ingest.py` 실행 — 미처리 raw 파일 수 확인 | 항상 실행 |
-| **Step 3** | `claude --dangerously-skip-permissions -p "...ingest 해줘"` 실행 후 `ingest.py --mark-done` | Step 2 exit code = 1 (미처리 파일 있음) 시에만 실행 |
-| **Step 4** | `curate.py --audit --lifecycle` 후 `claude -p "...distill 해줘"` 실행 | 매주 월요일(`$(date '+%u') = "1"`)에만 실행 |
+자동 실행을 별도로 구성할 때는 트리거·대상·산출물·실패 처리와 승인 범위를 정해야 한다. 기본 점검은 `curate.py --audit` 후보 보고로 두며, distill 메타데이터 쓰기·본문 작업·reweave 만료 이동·외부 공유를 자동 승인한 것으로 해석하지 않는다. 스케줄러 등록이나 실제 자동 운영 성공은 이 문서만으로 보장하지 않는다.
 
 ---
 
@@ -778,19 +752,20 @@ Label: `ai.habix.llm-wiki`
 
 - 환경변수: `OPENAI_API_KEY` (또는 `api_key_env` 지정값)
 - 모델: `gpt-4o-mini` (수업 기본값)
-- 키가 없으면 RULE 경로의 설치·검색 실습은 계속되며, LIVE 호출만 명확한 오류로 중단한다.
+- 이 API 엔진의 키가 없으면 compile은 RULE로 전환할 수 있고 AI 답변은 사용할 수 없다. `compile.py --rule`은 정리 모델을 호출하지 않는다. URL 수집·다운로드 등 다른 네트워크 기능까지 오프라인이라는 의미는 아니다.
 
 ### CLI 모드 (선택 호환, engine: cli)
 
 `schema/config.yaml`의 `engine: cli` 설정 시 사용. Claude Code CLI를 재사용한다.
 
 ```bash
-claude --dangerously-skip-permissions -p "프롬프트 내용" >> "$LOG" 2>&1
+claude -p "프롬프트 내용"
 ```
 
 - API 키 불필요
 - Claude Code 설치 필수
-- `run_daily.sh`에서 직접 호출(세션 없이 단발 실행). wiki_app 경로는 `llm_client`가 `claude -p` subprocess 를 관리(idle timeout·process-group kill·stderr 동시 drain).
+- compile과 wiki_app 경로는 `llm_client`가 `claude -p` subprocess를 관리한다(idle timeout·process-group kill·stderr 동시 drain). API 키 없이도 LIVE가 될 수 있다.
+- LIVE 정리는 설정 서비스로 입력을 전송한다. 일반 bulk compile 프롬프트에는 원문·정리 지침·분류·전체 index가 포함될 수 있다. 단일 메모 관리 경로는 선택 메모만 대상으로 하며 기존 index는 전송하지 않는다. 실제 전송 전에 사용자가 대상과 엔진을 알 수 있어야 한다.
 
 ### Anthropic API 모드 (선택 호환, engine: api)
 
@@ -845,10 +820,9 @@ response = client.messages.create(
 | `uv run python scripts/express.py summary --week` | `express.py` | Claude가 `express/summary/*.md` 읽고 요약 작성 |
 | `uv run python scripts/express.py summary --month` | `express.py` | Claude가 `express/summary/*.md` 읽고 요약 작성 |
 | `uv run python scripts/express.py report TOPIC` | `express.py` | Claude가 `express/report/*.md` 읽고 리포트 작성 |
-| "ingest 해줘" (Claude Code 세션) | `CLAUDE.md` → `ingest.py` | Claude가 raw/ 읽고 wiki/ 컴파일 |
-| "curate 해줘" (Claude Code 세션) | `CLAUDE.md` → `curate.py` | Claude가 wiki/ 감사·distill 수행 |
+| "ingest 해줘" (Claude Code 세션) | `commands/ingest.md` → `ingest.py`·`compile.py` | 선택한 엔진의 compile 경로로 정리 |
+| "curate 해줘" (Claude Code 세션) | `commands/curate.md` → `curate.py --audit` | 후보 보고만; 본문 작업 별도 승인 |
 | "RAG에 대해 알려줘" (Claude Code 세션) | `CLAUDE.md` query 모드 | Claude가 `index.md` → wiki 페이지 로드 후 답변 |
-| launchd 매일 07:00 | `run_daily.sh` | Step 3·4에서 `claude -p` 호출 |
 
 ---
 
@@ -1036,7 +1010,9 @@ synthesis 대상 선정 → reweave_queue.md
 ```
 
 - 초안 PRD의 curate.py 내 LLM 직접 호출(`synthesize_page` 훅)안은 **기각** — 기존 distill_queue.md 패턴(스크립트=큐, 커맨드=실행)을 확장한다.
-- shrink 가드(본문·sources 감소 시 저장 거부 + `WARN shrink`)는 결정적이므로 스크립트 측.
+- 현재 shrink 가드는 다음 reweave에서 이전 스냅샷 대비 축소를 `WARN shrink`로 보고한다. 저장 자체를 차단하지 않으므로 승인된 작성 주체가 저장 전에 본문·sources 보존을 확인한다.
+
+Promotion Gates는 선택 정책이며 현재 RULE/LIVE compile의 모든 신규 페이지에 자동 적용되지 않는다. 또한 현재 자동 근거 원장은 페이지의 `sources`가 정확히 하나의 raw 경로여야 한다. 다중 출처 종합은 statement별 출처 귀속을 지원하지 않아 자동 build 전체를 fail closed할 수 있다. 큐는 후보로 보고하고 자동 query용 wiki에 다중 출처 종합을 적용하지 않는다. 출처 축소로 우회하지 않으며 별도 검토용 산출물은 위치·목적을 승인받은 경우에만 작성한다(`schema/curate.md`, `schema/claim_ledger.md`).
 
 ## §B — 모듈 배치
 
@@ -1071,16 +1047,9 @@ scripts/
 
 **scope:private 필터 (v0.3.2 WS-6 P1, team-ready 훅):** `okf_export._is_scope_private`가 frontmatter `scope: private` 페이지를 공개 번들에서 **항상 제외**한다(`exclude_paths`·`--strip-internal` 플래그와 무관 — public 커밋은 one-way door라 플래그 게이트로 두면 flag 없는 fresh clone/CI가 private을 유출한다). `business/**`와 같은 레일: `stats.excluded`에 반영 + `stats.excluded_private`로 분리 집계(dry-run/log에 표면화) + 이를 가리키던 링크는 redact. `scope` 미지정·`shared`는 포함(하위호환). `--strip-internal`은 소유자 노출 방지로 `owner`/`scope` 내부 필드도 제거(비-예약 필드라 x-llmbrain-* 전면 제거의 부산물 — 테스트로 고정).
 
-## §E — 배치 개정 (run_daily.sh)
+## §E — 배치 설계의 지원 경계
 
-```
-Step 1 sync_raw.py (매일)                       [기존]
-Step 2 ingest.py 감지 (매일)                     [기존]
-Step 3 claude -p ingest (미처리 시)              [기존 — 경로 drift(~/Documents/llm-wiki) 수정 선행]
-Step 4 curate --reweave --fix (매일)             [신규]
-Step 5 curate --distill (월요일)                 [기존]
-Step 6 curate --reweave --fix --weekly-summary (일요일)  [신규]
-```
+과거 배치 개정안은 현재 공개 설치 절차가 아니며 운영 스크립트나 스케줄러가 제공되지 않는다. 자동 실행 구성 시에는 위 "자동화 지원 경계"의 승인 범위를 먼저 정한다. 기본 audit 후보 보고와 메타데이터 쓰기·만료 이동·별도 본문 작업을 구분한다.
 
 ## §F — 테스트 계약 (경계값)
 

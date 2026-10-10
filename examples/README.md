@@ -1,48 +1,39 @@
-# Examples — seed-wiki + seed-raw
+# Examples, 수업 seed와 입력 자료
 
-두 가지 데모를 제공한다:
+세 가지 예제를 제공한다:
 
 | 폴더 | 무엇 | 언제 |
 |---|---|---|
-| **`seed-wiki/`** | 이미 컴파일된 5페이지 sample **wiki** (결과물) | fresh clone 후 즉시 `wiki_app` 데모를 보고 싶을 때 |
-| **`seed-raw/`** | 가상 PM 11개 **raw 노트** (입력) | `raw → wiki` **컴파일 과정**(`/llm-brain:ingest`)을 직접 체험하고 싶을 때 |
+| **`course-seed-wiki/`** | raw 출처가 함께 있는 수업용 위키 5페이지 | `compile.py --seed`로 검색과 페이지 보기를 먼저 체험할 때 |
+| **`seed-wiki/`** | 기존 제품 소개용 위키 5페이지 | 이전 결과물 구조를 읽어 볼 때 |
+| **`seed-raw/`** | 가상 실무자 raw 노트 17개 (README 제외) | `raw → wiki` 컴파일 과정을 직접 체험할 때 |
 
-> 빈손으로 시작하는 수강생은 `seed-raw/`를 `raw/`에 복사해 ingest하면 "흩어진 메모 → 연결된 위키 그래프"를 체험할 수 있다. 자세한 실습 순서는 `seed-raw/README.md` 참조.
+> 입력부터 체험하려면 `seed-raw/README.md`의 기존 파일을 덮어쓰지 않는 복사 절차를 따른다. 복사 뒤 `uv run python scripts/compile.py --rule`로 정리 모델 호출 없이 위키를 만들 수 있다.
 
 ## seed-wiki 레이아웃
 
-seed-wiki는 **자기 완결형**이라 그대로 프로젝트 루트에 복사하면 app이 읽는 구조와 1:1로 맞는다.
+기존 `seed-wiki/`는 결과물 구조를 보여 주는 예제다. 현재 수업의 설치 경로는 아래 `--seed`이며, 이 폴더를 사용자 위키에 수동으로 복사하지 않는다.
 
-- `examples/seed-wiki/index.md` → 루트 `index.md`로 복사 (app은 루트 `index.md`를 읽음)
-- `examples/seed-wiki/wiki/` → 루트 `wiki/`로 복사 (app은 `wiki/<category>/<slug>.md` + `wiki/graph.json`을 읽음)
+- `examples/seed-wiki/index.md`: 기존 5페이지 데모 목차
+- `examples/seed-wiki/wiki/`: 기존 페이지와 `graph.json`
 
-> app은 `wiki_root = <프로젝트 루트>/wiki`, index는 `wiki_root`의 부모인 루트 `index.md`를 읽는다. seed의 `index.md` 5개 슬러그와 `wiki/` 5개 페이지가 정합하므로 `/api/index`의 `total_pages`가 디스크 페이지 수(5)와 일치한다.
+> app은 루트 `index.md`와 `wiki/`를 읽는다. `examples/` 안의 파일을 직접 읽는 것이 아니므로 화면 체험에는 아래 수업 seed 설치 명령을 사용한다. 기존 제품 예제의 외부 URL 출처를 현재 raw 기반 근거 원장과 호환된다고 간주하지 않는다.
 
 ## 사용법
 
-### Option A — 데모만 보고 자기 wiki 시작 (권장)
+### Option A, 수업용 데모 보기 (권장)
 
-루트 `index.md`는 fresh clone에 포함된 **작성자 개인 인덱스(97페이지)**다. 데모용 5페이지 index로 잠깐 교체하므로, 먼저 백업한다.
+저장소 루트에서 실행한다. `index.md`는 사용자 위키에서 생성되는 파일이며 fresh clone에 작성자 개인 인덱스가 포함되어 있지 않다.
 
 ```bash
-# (1) 작성자 index.md 백업 — 데모 후 복원용
-cp index.md index.md.bak
-
-# (2) seed-wiki를 app이 읽는 위치로 복사
-cp -r examples/seed-wiki/wiki ./wiki        # → wiki/concepts, wiki/tools, wiki/graph.json
-cp examples/seed-wiki/index.md ./index.md   # → 루트 index.md (5페이지 데모용)
-
-# (3) wiki_app 실행
+uv run python scripts/compile.py --seed
 uv run python -m wiki_app
-# → http://localhost:8000 에서 5개 sample 페이지 검색·페이지뷰 가능
-#   /api/index 의 total_pages = 5 (디스크와 정합)
-
-# (4) 데모 종료 후 — 작성자 index 복원 + 데모 wiki 정리
-mv index.md.bak index.md
-rm -rf wiki                                  # wiki/ 는 .gitignore 대상이라 git에 흔적 없음
+# 터미널에 출력된 실제 주소로 접속 (보통 http://localhost:8000)
 ```
 
-이후 자신의 raw 소스를 `raw/`에 추가하고 ingest → wiki/ 구축.
+`--seed`는 `course-seed-wiki/`의 위키, 목차와 공개 raw 원문 5편을 설치하고 처리 상태를 기록한다. 기존 위키 페이지가 있거나 같은 이름의 다른 raw 원문이 있으면 중단한다. `--force`로 자기 자료를 덮어쓰지 않는다. 기존 위키가 있으면 바로 화면을 열거나 README의 논문 실습을 진행한다.
+
+검색창에 `인터뷰`를 넣어 수업용 페이지를 확인한다. 8000번이 사용 중이면 다음 빈 포트를 사용하므로 터미널에 표시된 주소를 연다. 데모 종료는 `Ctrl+C`이며 위키를 삭제하는 정리 단계는 없다. 이후 자신의 메모를 ingest하고 `compile.py --rule`로 위키에 추가한다.
 
 ### Option B — 자기 wiki만 사용 (seed 건너뛰기)
 
@@ -55,11 +46,11 @@ rm -rf wiki                                  # wiki/ 는 .gitignore 대상이라
 - `wiki/concepts/distill-progressive.md` — Progressive Summarization
 - `wiki/tools/claude-code.md` — Claude Code CLI
 - `wiki/tools/obsidian.md` — Obsidian
-- `wiki/graph.json` — wikilink 그래프 (13 links)
-- `index.md` — 5페이지 데모 인덱스 (루트로 복사됨)
+- `wiki/graph.json` — 페이지와 태그를 연결하는 그래프
+- `index.md` — 기존 5페이지 데모 인덱스
 
-상호 wikilink 13개로 연결돼 있어, wiki_app의 검색·페이지뷰·wikilink 클릭 모두 즉시 작동합니다.
+기존 예제의 그래프와 페이지 연결을 읽어 볼 수 있다. `compile.py --seed`로 설치되는 수업 예제의 내용과는 다르다.
 
-## CI 영향
+## 테스트 데이터 경계
 
-이 seed 데이터는 `tests/conftest.py`의 `_HAS_USER_WIKI` fallback에도 사용됩니다. GitHub Actions가 `examples/seed-wiki/wiki/`(+ `examples/seed-wiki/index.md`)를 wiki 데이터로 활용해 21개 wiki-dependent test를 skip 없이 실행할 수 있습니다 (CI workflow에 복사 step 추가 후).
+`tests/conftest.py`는 작성자 전용 자료를 요구하는 `requires_user_wiki` 테스트만 실제 자료가 없을 때 skip한다. seed 설치를 작성자 데이터 검증으로 취급하지 않는다. 격리 fixture를 쓰는 테스트는 사용자 위키와 별도로 실행된다.

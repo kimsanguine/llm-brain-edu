@@ -14,7 +14,7 @@ def snippet():
                             "brain_manage": {"command": "manager", "args": ["--allow-writes"]}}}
 
 
-def test_one_apply_adds_both_skills_and_preserves_profile(tmp_path):
+def test_one_apply_adds_canonical_skill_and_preserves_profile(tmp_path):
     from wiki_app.hermes_bundle_setup import apply_bundle
     config = tmp_path / "config.yaml"
     original = b"model: dummy\nmemory: {provider: mem0}\nmcp_servers: {other: {command: keep}}\n"
@@ -26,7 +26,7 @@ def test_one_apply_adds_both_skills_and_preserves_profile(tmp_path):
     assert updated["mcp_servers"]["other"] == {"command": "keep"}
     assert set(updated["mcp_servers"]) == {"brain", "brain_manage", "other"}
     assert (tmp_path / "skills/llm-brain/SKILL.md").is_file()
-    assert (tmp_path / "skills/llm-brain-manage/SKILL.md").is_file()
+    assert not (tmp_path / "skills/llm-brain-manage/SKILL.md").exists()
     assert (tmp_path / "config.yaml.brain-hermes.bak").read_bytes() == original
     before = config.read_bytes()
     apply_bundle(config, snippet())
@@ -52,7 +52,7 @@ def test_conflicts_stop_before_profile_or_skills_change(tmp_path, conflict):
         data["mcp_servers"] = {key: {"command": "different"}}
     config.write_text(yaml.safe_dump(data))
     if conflict == "skill":
-        skill = tmp_path / "skills/llm-brain-manage/SKILL.md"
+        skill = tmp_path / "skills/llm-brain/SKILL.md"
         skill.parent.mkdir(parents=True)
         skill.write_text("my custom skill")
     if conflict == "backup":
@@ -62,6 +62,84 @@ def test_conflicts_stop_before_profile_or_skills_change(tmp_path, conflict):
         apply_bundle(config, snippet())
     after = {str(p.relative_to(tmp_path)): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
     assert after == before
+
+
+def test_existing_custom_legacy_skill_is_preserved(tmp_path):
+    from wiki_app.hermes_bundle_setup import apply_bundle
+    config = tmp_path / "config.yaml"
+    config.write_text("model: unchanged\n")
+    legacy = tmp_path / "skills/llm-brain-manage/SKILL.md"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("my legacy skill")
+    apply_bundle(config, snippet())
+    assert legacy.read_text() == "my legacy skill"
+
+
+def test_migration_flag_does_not_authorize_custom_skill_overwrite(tmp_path):
+    from wiki_app.hermes_bundle_setup import apply_bundle
+    config = tmp_path / "config.yaml"
+    config.write_text("model: unchanged\n")
+    target = tmp_path / "skills/llm-brain/SKILL.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("my custom skill")
+    before = {str(p.relative_to(tmp_path)): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    with pytest.raises(ValueError):
+        apply_bundle(config, snippet(), migrate_public_skill=True)
+    assert {str(p.relative_to(tmp_path)): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+
+
+@pytest.mark.parametrize("approved", [False, True])
+def test_known_public_reader_migration_requires_approval_and_keeps_reader(tmp_path, approved):
+    from wiki_app.hermes_bundle_setup import apply_bundle
+    original_skill = (Path(__file__).parent / "fixtures/hermes_public_reader_skill.md").read_bytes()
+    target = tmp_path / "skills/llm-brain/SKILL.md"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(original_skill)
+    reader = {"command": "old-reader", "args": ["-m", "wiki_app.brain_mcp", "--brain-root", str(tmp_path)], "cwd": "old-runtime"}
+    config = tmp_path / "config.yaml"
+    config.write_text(yaml.safe_dump({"memory": {"provider": "mem0"}, "mcp_servers": {"brain": reader}}))
+    original_config = config.read_bytes()
+    desired = snippet()
+    desired["mcp_servers"]["brain"]["args"] = reader["args"]
+    if not approved:
+        with pytest.raises(ValueError):
+            apply_bundle(config, desired)
+        assert config.read_bytes() == original_config
+        assert target.read_bytes() == original_skill
+        assert not target.with_name("SKILL.md.brain-public.bak").exists()
+        return
+    apply_bundle(config, desired, migrate_public_skill=True)
+    canonical = Path(__file__).resolve().parents[1] / "integrations/hermes/llm-brain/SKILL.md"
+    assert target.read_bytes() == canonical.read_bytes()
+    assert target.with_name("SKILL.md.brain-public.bak").read_bytes() == original_skill
+    data = yaml.safe_load(config.read_bytes())
+    assert data["mcp_servers"]["brain"] == reader
+    assert data["memory"] == {"provider": "mem0"}
+    after = config.read_bytes()
+    apply_bundle(config, desired, migrate_public_skill=True)
+    assert config.read_bytes() == after
+    assert target.with_name("SKILL.md.brain-public.bak").read_bytes() == original_skill
+
+
+def test_skill_backup_conflict_stops_before_config_migration(tmp_path):
+    from wiki_app.hermes_bundle_setup import apply_bundle
+    target = tmp_path / "skills/llm-brain/SKILL.md"
+    target.parent.mkdir(parents=True)
+    target.write_bytes((Path(__file__).parent / "fixtures/hermes_public_reader_skill.md").read_bytes())
+    target.with_name("SKILL.md.brain-public.bak").write_text("existing backup")
+    config = tmp_path / "config.yaml"
+    config.write_text("model: unchanged\n")
+    before = {str(p.relative_to(tmp_path)): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    with pytest.raises(ValueError):
+        apply_bundle(config, snippet(), migrate_public_skill=True)
+    assert {str(p.relative_to(tmp_path)): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+
+
+def test_migration_flag_without_apply_is_rejected():
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run([sys.executable, "-B", str(root / "integrations/hermes/connect.py"), "--with-management", "--migrate-public-skill"], capture_output=True)
+    assert result.returncode != 0
+    assert b"requires --with-management and --apply" in result.stderr
 
 
 def test_bundle_entry_preview_does_not_modify_brain_or_profile(tmp_path):

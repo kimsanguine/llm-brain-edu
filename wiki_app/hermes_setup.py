@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -67,7 +68,10 @@ def merge_copy(target: Path, snippet: dict, *, server_name="brain", backup_suffi
     return backup
 
 
-def skill_plan(home: Path, source: Path, *, skill_name="llm-brain") -> tuple[Path, bytes]:
+PUBLIC_READER_SKILL_SHA256 = "fa0532027c29fb3bb00a586f25633f49fa37b9253a6b3705234ba0d099f0ac9b"
+
+
+def skill_plan(home: Path, source: Path, *, skill_name="llm-brain", migrate_public_skill=False) -> tuple[Path, bytes]:
     """Inspect the chosen profile without creating folders or replacing user skills."""
     if skill_name not in ("llm-brain", "llm-brain-manage"):
         raise ValueError("Unsupported Brain skill name")
@@ -75,14 +79,41 @@ def skill_plan(home: Path, source: Path, *, skill_name="llm-brain") -> tuple[Pat
     if any(p.is_symlink() for p in (target, *target.parents)):
         raise ValueError("Skill path must not contain symlinks")
     content = source.read_bytes()
-    if target.exists() and (not target.is_file() or target.read_bytes() != content):
-        raise ValueError("Existing llm-brain skill differs; refusing overwrite")
+    if target.exists():
+        if not target.is_file() or target.stat().st_nlink != 1:
+            raise ValueError("Skill must be a regular file with no hard links")
+        original = target.read_bytes()
+        if original != content:
+            if not (migrate_public_skill and skill_name == "llm-brain" and
+                    hashlib.sha256(original).hexdigest() == PUBLIC_READER_SKILL_SHA256):
+                raise ValueError("Existing llm-brain skill differs; refusing overwrite")
+            backup = target.with_name("SKILL.md.brain-public.bak")
+            if backup.exists() or backup.is_symlink():
+                raise ValueError("Skill backup already exists; refusing overwrite")
     return target, content
 
 
-def install_skill(home: Path, source: Path, *, skill_name="llm-brain") -> Path:
-    target, content = skill_plan(home, source, skill_name=skill_name)
+def install_skill(home: Path, source: Path, *, skill_name="llm-brain", migrate_public_skill=False) -> Path:
+    target, content = skill_plan(home, source, skill_name=skill_name, migrate_public_skill=migrate_public_skill)
     if target.exists():
+        original = target.read_bytes()
+        if original != content:
+            # Explicit migration accepts only the pinned public reader version.
+            skill_plan(home, source, skill_name=skill_name, migrate_public_skill=migrate_public_skill)
+            initial = target.lstat()
+            backup_fd = os.open(target.with_name("SKILL.md.brain-public.bak"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(backup_fd, "wb") as file:
+                file.write(original)
+            fd, temporary = tempfile.mkstemp(prefix=".brain-skill-", dir=target.parent)
+            try:
+                with os.fdopen(fd, "wb") as file:
+                    file.write(content)
+                current = target.lstat()
+                if (current.st_dev, current.st_ino, current.st_mtime_ns, current.st_size, current.st_nlink) != (initial.st_dev, initial.st_ino, initial.st_mtime_ns, initial.st_size, 1) or target.is_symlink() or target.read_bytes() != original:
+                    raise ValueError("Skill changed during migration; refusing overwrite")
+                os.replace(temporary, target)
+            finally:
+                Path(temporary).unlink(missing_ok=True)
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
     # Recheck after directory creation. Exclusive creation never overwrites a file.
